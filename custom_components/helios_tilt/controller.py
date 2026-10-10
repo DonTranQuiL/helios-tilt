@@ -1364,9 +1364,10 @@ class HeliosSite:
             return None, REASON_MANUAL, "paused after a manual move", False
         if not panel.auto_enabled:
             return None, panel.target_reason, "automatic control off", False
-        if self.quiet and not panel.user_pending:
-            return None, REASON_QUIET, quiet_detail, False
         raw, reason, detail = self._strategy_plan(panel, now)
+        if self.quiet and not panel.user_pending and reason != REASON_NIGHT:
+            # quiet hours hold the strategy, but the night park still happens
+            return None, REASON_QUIET, quiet_detail, False
         current = panel.commanded if panel.commanded is not None else None
         angle = geo.clamp(round_to_step(raw, cfg.step, current, self.hysteresis))
         if (

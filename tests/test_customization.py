@@ -235,6 +235,33 @@ async def test_quiet_hours_hold_strategy(
     assert attr(hass, TARGET, "quiet") is False
 
 
+async def test_quiet_hours_allow_night_park(
+    hass: HomeAssistant, setup_site, weather, cover, freezer
+) -> None:
+    """Quiet hours hold tracking, but the night park at sunset still happens."""
+    from .conftest import PANEL_DATA
+
+    freezer.move_to("2026-06-21 17:00:00+00:00")  # 19:00 CEST, sun still up
+    weather()  # fresh wind data
+    await setup_site(
+        panels=[{**PANEL_DATA, "strategy": "tracking"}],
+        options={"quiet_start": "18:00:00", "quiet_end": "07:00:00"},
+    )
+    assert cover.positions == []
+    assert attr(hass, TARGET, "reason") == "quiet"
+    freezer.move_to("2026-06-21 21:00:00+00:00")  # 23:00 CEST, after sunset
+    weather()
+    await advance(hass, freezer, 1)
+    assert cover.positions == [25]  # night angle 15 deg
+    assert hass.states.get(LAST).state == "night"
+    assert attr(hass, TARGET, "quiet") is True
+    freezer.move_to("2026-06-22 04:30:00+00:00")  # 06:30 CEST, sun up, still quiet
+    weather()
+    await advance(hass, freezer, 1)
+    assert cover.positions == [25]
+    assert attr(hass, TARGET, "reason") == "quiet"
+
+
 async def test_quiet_until_next_day(
     hass: HomeAssistant, setup_site, cover, freezer
 ) -> None:

@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.0 (2026-10-10)
+
+First stable release, tested on a real Tuya ZG-2002-RF two-relay setup.
+
+**Highlights**
+
+- **Works with dumb actuators:** the *Two relays (timed)* actuator type drives actuators that have no feedback. It estimates the position from run time (separate open and close times), homes against the limit switches, interlocks the relays, uses the relay countdown as a fail-safe, detects the RF remote, and handles offline relays. A guided **Time the travel** calibration is included and **required** after setup.
+- Real sun position and four strategies: daily optimum, tracking with a cloudy-day mode and night park, a seasonal curve, and a fixed annual optimum.
+- Safety first: wind and gust stow with a calm period, a latching storm mode, snow/rain/frost positions, custom stow triggers and an optional wind direction rule.
+- Customization: your own rain, snow and temperature sensors; quiet hours; a timed stow; and source attributes that show what drives each decision.
+- A dashboard card in English and Dutch, with badges for relay offline, uncertain position and quiet hours.
+
+**Changes since beta.6**
+
+- Quiet hours no longer hold the **night park** (tracking strategy): parking at sunset still happens, and the panel then rests until the quiet hours end. Daytime strategy moves stay held.
+- README rewritten:
+  - a "Works with dumb actuators" section with a wiring diagram;
+  - a required calibration guide and a complete ZG-2002-RF example;
+  - how the strategies choose the angle, including why panels sit at their maximum in autumn and winter;
+  - the safety priority, the customization options, and an FAQ.
+- Docs site updated to match.
+
 ## 0.1.0-beta.6 (2026-10-10)
 
 - **Source transparency:** the *Wind stow* and *Storm mode* sensors (and diagnostics) show the sources (`weather_entity`, `wind_sensor`), each value (`weather_wind`, `weather_gust`, `sensor_wind`) and which one drives the wind now (`wind_source`), plus the wind bearing and the temperature source. The README and the setup help recommend a weather entity with gusts (e.g. Buienradar).

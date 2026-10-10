@@ -864,6 +864,8 @@ async def test_already_off_counts_as_confirmed(
     assert off and on
     assert on[0] - off[0] < 1.5  # interlock pause only, not the 5 s timeout
     assert panel_of(relay_site).driver.fault is None
+    await run(hass, freezer, 60)  # let the run finish: no lingering timers
+    await hass.config_entries.async_unload(relay_site.entry_id)
 
 
 async def test_faults_back_off(

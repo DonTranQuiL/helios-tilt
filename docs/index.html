@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Helios Tilt | Home Assistant</title>
-    <meta name="description" content="Helios Tilt: automatic solar panel tilt control on linear actuators for Home Assistant. Real sun position, four strategies, wind and storm stow, and a dashboard card.">
+    <meta name="description" content="Helios Tilt: automatic solar panel tilt control for Home Assistant. Works with dumb actuators on two relays (Tuya ZG-2002-RF), real sun position, four strategies, wind and storm stow, and a dashboard card.">
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <meta name="theme-color" content="#0B1120">
     <meta property="og:type" content="website">
     <meta property="og:title" content="Helios Tilt: solar panels that follow the sun">
-    <meta property="og:description" content="Automatic tilt control for solar panels on linear actuators. Tracking, seasonal and daily strategies, wind and storm stow, covers, numbers or scripts.">
+    <meta property="og:description" content="Automatic tilt control for solar panels on linear actuators, even dumb ones on two relays. Tracking, seasonal and daily strategies, wind and storm stow, quiet hours and custom stow triggers.">
     <meta property="og:url" content="https://dontranquil.github.io/helios-tilt/">
     <meta property="og:image" content="https://dontranquil.github.io/helios-tilt/images/banner.png">
     <meta name="twitter:card" content="summary_large_image">
@@ -35,6 +35,7 @@
             </a>
             <div class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
                 <a href="#features" class="hover:text-white transition-colors">Features</a>
+                <a href="#relays" class="hover:text-white transition-colors">Dumb actuators</a>
                 <a href="#angle" class="hover:text-white transition-colors">How it decides</a>
                 <a href="#safety" class="hover:text-white transition-colors">Safety</a>
                 <a href="#installation" class="hover:text-white transition-colors">Install</a>
@@ -51,7 +52,7 @@
         <div class="max-w-7xl mx-auto px-6 relative z-10 text-center">
             <img src="icon.png" alt="Helios Tilt" class="w-28 h-28 mx-auto mb-8 rounded-3xl drop-shadow-2xl">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-900/30 border border-amber-500/30 text-amber-300 text-sm font-medium mb-6">
-                Solar tilt control for Home Assistant &middot; beta
+                Solar tilt control for Home Assistant &middot; v0.1.0 stable
             </div>
             <h1 class="text-5xl md:text-7xl font-extrabold text-white tracking-tight mb-6">Follow the sun.<br>Stow before the storm.</h1>
             <p class="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">Helios Tilt works out where the sun is, picks the best angle for each panel and drives your linear actuator there. When the wind picks up, it stows the panels first.</p>
@@ -64,6 +65,7 @@
                 <span class="px-4 py-1.5 rounded-full border border-amber-400/60 bg-amber-400/10 text-amber-300 font-semibold">Tracking + seasonal</span>
                 <span class="px-4 py-1.5 rounded-full border border-amber-400/60 bg-amber-400/10 text-amber-300 font-semibold">Daily optimum</span>
                 <span class="px-4 py-1.5 rounded-full border border-cyan-400/60 bg-cyan-400/10 text-cyan-300 font-semibold">Wind + storm stow</span>
+                <span class="px-4 py-1.5 rounded-full border border-cyan-400/60 bg-cyan-400/10 text-cyan-300 font-semibold">Two relays (ZG-2002-RF)</span>
                 <span class="px-4 py-1.5 rounded-full border border-cyan-400/60 bg-cyan-400/10 text-cyan-300 font-semibold">Cover / number / script</span>
             </div>
         </div>
@@ -97,6 +99,11 @@
                     <p class="text-slate-400 text-sm leading-relaxed">A cover, a number, a script, or a dumb actuator on two relays (such as a Tuya ZG-2002-RF): timed runs with an interlock, a countdown fail-safe, guided travel calibration and automatic homing. Linear or calibration-table mapping and position or inclinometer feedback.</p>
                 </div>
                 <div class="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6">
+                    <i data-lucide="sliders-horizontal" class="text-amber-400 w-7 h-7 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-white mb-2">Your rules</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Your own rain, snow and temperature sensors, custom stow triggers, quiet hours (the night park still happens), a timed stow and an optional wind direction rule. Attributes show which source drives each decision.</p>
+                </div>
+                <div class="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6">
                     <i data-lucide="shield-check" class="text-amber-400 w-7 h-7 mb-4"></i>
                     <h3 class="text-xl font-semibold text-white mb-2">Gentle on hardware</h3>
                     <p class="text-slate-400 text-sm leading-relaxed">Never commands a moving actuator. Minimum interval, deadband, hysteresis, a pause after manual moves, and a repair notice when an actuator gets stuck.</p>
@@ -110,6 +117,37 @@
         </div>
     </section>
 
+    <section id="relays" class="py-20 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-start">
+            <div>
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Works with dumb actuators</h2>
+                <p class="text-slate-400 mb-6">Two cheap relays are enough. Tested on a real Tuya ZG-2002-RF dual relay (Zigbee2MQTT) driving an attic window opener.</p>
+                <ul class="space-y-3 text-sm text-slate-300 list-disc list-inside">
+                    <li><span class="text-white font-semibold">Time-based position</span> with separate open and close times.</li>
+                    <li><span class="text-white font-semibold">Homing</span> against the actuator's limit switches: first move, after N moves, before the night park, or with Home now.</li>
+                    <li><span class="text-white font-semibold">Interlock</span>: the other relay is switched off and confirmed first; both-on is caught.</li>
+                    <li><span class="text-white font-semibold">Countdown fail-safe</span>: the relay switches itself off even if Home Assistant crashes mid-run.</li>
+                    <li><span class="text-white font-semibold">RF remote</span> use is detected and followed; automatic control pauses.</li>
+                    <li><span class="text-white font-semibold">Relay offline</span>: nothing is switched, a repair appears, and it recovers by itself.</li>
+                </ul>
+            </div>
+            <div class="rounded-2xl border border-amber-500/30 bg-amber-900/10 p-6">
+                <h3 class="text-xl font-bold text-white mb-3">Time the travel (required)</h3>
+                <ol class="space-y-2 text-sm text-slate-300 list-decimal list-inside">
+                    <li>Enter the panel angle when fully closed and fully open.</li>
+                    <li>Panel &#8942; &rarr; Reconfigure &rarr; <span class="text-white">Time the travel</span>.</li>
+                    <li>Submit when it stops fully open, then again when it stops fully closed.</li>
+                    <li>Save, press <span class="text-white">Home now</span>, test a wind stow.</li>
+                </ol>
+                <pre class="rounded-xl bg-[#0B1120] border border-slate-700 p-4 text-xs text-slate-300 overflow-x-auto mt-4"><code>Open relay       switch.&lt;name&gt;_l1
+Close relay      switch.&lt;name&gt;_l2
+Open countdown   number.&lt;name&gt;_countdown_l1
+Close countdown  number.&lt;name&gt;_countdown_l2</code></pre>
+                <p class="text-xs text-slate-400 mt-3">Zigbee2MQTT: power_on_behavior off on both channels; inching off, or longer than full travel &times; 1.15 + 5 s. Fuse the supply. <a class="text-amber-300 hover:underline" href="https://github.com/DonTranQuiL/helios-tilt#works-with-dumb-actuators-two-relays-timed">Full guide and wiring</a>.</p>
+            </div>
+        </div>
+    </section>
+
     <section id="angle" class="py-20 bg-slate-900/40 border-y border-slate-800">
         <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-start">
             <div>
@@ -118,14 +156,17 @@
                 <div class="rounded-2xl border border-slate-700 bg-[#0d1326] p-6">
                     <ol class="space-y-3 text-sm list-decimal list-inside text-slate-300">
                         <li><span class="text-white font-semibold">Storm or wind stow</span>: stow angle, immediately</li>
-                        <li><span class="text-white font-semibold">Stowed by hand</span>: stow angle</li>
+                        <li><span class="text-white font-semibold">Custom stow trigger</span>: trigger angle, immediately</li>
+                        <li><span class="text-white font-semibold">Stowed by hand</span> (optionally for a duration): stow angle</li>
                         <li><span class="text-white font-semibold">No valid wind data</span>: hold (stay stowed if it was windy)</li>
                         <li><span class="text-white font-semibold">Snow / heavy rain / frost</span>: their own angles (optional)</li>
                         <li><span class="text-white font-semibold">Manual mode</span>: your angle</li>
                         <li><span class="text-white font-semibold">Paused</span> after a move by hand, or automatic control off: hold</li>
+                        <li><span class="text-white font-semibold">Quiet hours</span>: hold (the night park still happens)</li>
                         <li><span class="text-white font-semibold">Strategy</span>: rounded to the step, with hysteresis, a deadband and a minimum interval</li>
                     </ol>
                 </div>
+                <p class="text-sm text-slate-400 mt-6">Why the maximum angle all autumn and winter? At 52&deg; N the best daily angle is about 58&deg; in October and 75&deg; at Christmas, steeper than most mounts allow, so every strategy clamps to your maximum. Prefer a weather entity with gusts (e.g. Buienradar).</p>
             </div>
             <div class="rounded-2xl border border-cyan-500/30 bg-cyan-900/10 p-6">
                 <img src="images/card.png" alt="The Helios Tilt card with demo data" class="rounded-xl border border-slate-700 w-full" loading="lazy">
@@ -159,10 +200,10 @@
                 <div class="rounded-2xl border border-slate-700/50 bg-slate-800/30 p-8">
                     <h3 class="text-2xl font-bold text-white mb-6">HACS</h3>
                     <ol class="space-y-4 text-sm text-slate-300">
-                        <li>1. Click <a class="text-amber-300 hover:underline" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=DonTranQuiL&amp;repository=helios-tilt&amp;category=integration">Open in HACS</a>, enable beta versions and download Helios Tilt.</li>
+                        <li>1. Click <a class="text-amber-300 hover:underline" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=DonTranQuiL&amp;repository=helios-tilt&amp;category=integration">Open in HACS</a> and download Helios Tilt.</li>
                         <li>2. Restart Home Assistant.</li>
                         <li>3. Settings &rarr; Devices &amp; services &rarr; Add integration &rarr; Helios Tilt.</li>
-                        <li>4. Pick your weather entity, then the first panel's actuator, azimuth, limits and strategy. To add more panels, use &#8942; &rarr; Add panel.</li>
+                        <li>4. Pick your weather entity, then the first panel's actuator, azimuth, limits and strategy. Two relays: time the travel. To add more panels, use &#8942; &rarr; Add panel.</li>
                     </ol>
                 </div>
                 <div class="rounded-2xl border border-cyan-500/30 bg-cyan-900/10 p-8">
