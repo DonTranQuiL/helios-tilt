@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-beta.4 (2026-10-10)
+
+- Panel setup in steps. Step 1 asks for the name and actuator type, step 2 for only that type's fields (entity + mapping, or the relays, countdowns, travel times and end angles) plus the geometry, and step 3 for the positions and PV. The generic *Actuator* field no longer appears for two-relay panels. Reconfigure uses the same steps, and switching the type drops the old type's settings.
+- Positions are kept within the soft limits: defaults are clamped, the fields stop at the limits, and the help text shows the range.
+- The seasonal winter/summer angles are suggested from the latitude (about lat + 15° / lat − 35°, clamped). Equal winter and summer angles show a one-time hint that the curve is flat.
+- Two-relay panels never command or watch a generic actuator entity, even if one was saved earlier.
+- Clearer errors: same relay, same countdown and same end angles point at the field.
+
 ## 0.1.0-beta.3 (2026-10-10)
 
 - New actuator type **Two relays (timed)** for dumb actuators without position feedback, such as a Tuya ZG-2002-RF dual relay via Zigbee2MQTT. The position is estimated from run time, with separate open and close speeds and an optional start delay.

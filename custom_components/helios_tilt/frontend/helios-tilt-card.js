@@ -1,7 +1,7 @@
 // Helios Tilt card: side view of each panel with the sun, wind gauge,
 // controls, today's angle plan and the last moves. Plain custom element, no
 // build step. Keep this file ASCII-only (use \u escapes).
-const VERSION = "0.1.0b3";
+const VERSION = "0.1.0b4";
 const DOMAIN = "helios_tilt";
 const DEG = "\u00b0";
 const DASH = "\u2013";

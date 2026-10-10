@@ -472,8 +472,6 @@ PANEL_DESC["en"]["actuator_type"] = (
 PANEL_DESC["nl"]["actuator_type"] = (
     "Een bestaande entiteit (cover, number of script), of twee relais (open + dicht) die een domme actuator op tijd aansturen."
 )
-PANEL_DESC["en"]["actuator_entity"] += " Only for the entity type."
-PANEL_DESC["nl"]["actuator_entity"] += " Alleen voor het type entiteit."
 SECTIONS["en"] = {
     "relays": (
         "Two relays (timed)",
@@ -555,7 +553,7 @@ SECTIONS["nl"]["mapping_feedback"][2]["calibration"] = (
 ERRORS["en"].update(
     {
         "actuator_required": "Choose the actuator entity, or pick the two relays type.",
-        "relays_required": "Choose both the open and the close relay (in the Two relays section).",
+        "relays_required": "Choose both the open and the close relay.",
         "same_relay": "The open and close relay must be different switches.",
         "same_countdown": "The two countdowns must be different entities.",
         "same_end_angles": "The angles at fully closed and fully open must differ.",
@@ -567,7 +565,7 @@ ERRORS["en"].update(
 ERRORS["nl"].update(
     {
         "actuator_required": "Kies de actuator-entiteit, of kies het type twee relais.",
-        "relays_required": "Kies zowel het open- als het dicht-relais (in de sectie Twee relais).",
+        "relays_required": "Kies zowel het open- als het dicht-relais.",
         "same_relay": "Het open- en dicht-relais moeten verschillende schakelaars zijn.",
         "same_countdown": "De twee afteltijden moeten verschillende entiteiten zijn.",
         "same_end_angles": "De hoeken bij volledig dicht en volledig open moeten verschillen.",
@@ -742,19 +740,175 @@ for _lang in ("en", "nl"):
     T[_lang]["exceptions"]["not_relays"] = RELAY_T[_lang]["not_relays"]
 
 
-def panel_step(lang: str, title: str, desc: str | None) -> dict:
-    step = {
+GEOMETRY = ("axis", "azimuth", "min_angle", "max_angle", "step", "strategy")
+RELAY_MAIN = (
+    "open_switch",
+    "close_switch",
+    "open_countdown",
+    "close_countdown",
+    "open_time",
+    "close_time",
+    "angle_closed",
+    "angle_open",
+)
+RELAY_ADVANCED = (
+    "start_delay",
+    "home_overrun",
+    "reverse_delay",
+    "home_after_moves",
+    "home_at_night",
+    "home_end",
+    "mapping",
+    "calibration",
+)
+POSITIONS = (
+    "stow_angle",
+    "night_angle",
+    "diffuse_angle",
+    "snow_angle",
+    "rain_angle",
+    "frost_angle",
+    "winter_angle",
+    "summer_angle",
+    "season_weight",
+)
+STEPS = {
+    "en": {
+        "first_title": "First panel",
+        "first_desc": "One mount driven by one actuator. Name it and choose how it is driven; the next step asks only for that type's settings. Add more panels later from the integration page.",
+        "add_title": "Add a panel",
+        "add_desc": "Name the panel and choose how it is driven. The next step asks only for that type's settings.",
+        "change_title": "Change panel",
+        "change_desc": "Changing the actuator type starts that type's settings from the defaults.",
+        "entity_title": "{name}: actuator entity",
+        "entity_desc": "The entity Helios commands, the panel geometry, and how actuator positions map to panel angles.",
+        "mapping_section": "Mapping and feedback",
+        "relays_title": "{name}: two relays (timed)",
+        "relays_desc": "The open and close relay, their countdowns as a hardware fail-safe, the full travel times and the panel angle at both ends. The minimum and maximum angle must lie between the two end angles.",
+        "advanced_section": "Homing, timing and stroke table",
+        "positions_title": "{name}: positions",
+        "positions_desc": "Every angle here is kept between the soft limits, {min}\u00b0 and {max}\u00b0: the panel never goes beyond a limit. Suggested seasonal angles for latitude {latitude}\u00b0: winter {winter}\u00b0, summer {summer}\u00b0 (about latitude + 15 and latitude - 35, within the limits).",
+        "clamp": "Kept between the soft limits, {min}\u00b0 to {max}\u00b0.",
+        "winter": "Seasonal strategy, at the winter solstice. Steeper than summer: about latitude + 15.",
+        "summer": "Seasonal strategy, at the summer solstice: about latitude - 35. Equal to winter means a flat curve.",
+        "calibration_relays": "With a calibration table: angle:stroke% pairs (0 = fully closed), e.g. 10:0, 20:40, 30:75, 40:100.",
+        "mapping_relays": "Linear maps the stroke between the two end angles. A table is for non-linear mounts.",
+    },
+    "nl": {
+        "first_title": "Eerste paneel",
+        "first_desc": "Een constructie met een actuator. Geef het een naam en kies hoe het wordt aangestuurd; de volgende stap vraagt alleen de instellingen voor dat type. Meer panelen voeg je later toe via de integratiepagina.",
+        "add_title": "Paneel toevoegen",
+        "add_desc": "Geef het paneel een naam en kies hoe het wordt aangestuurd. De volgende stap vraagt alleen de instellingen voor dat type.",
+        "change_title": "Paneel wijzigen",
+        "change_desc": "Wissel je van type actuator, dan beginnen de instellingen van dat type bij de standaardwaarden.",
+        "entity_title": "{name}: actuator-entiteit",
+        "entity_desc": "De entiteit die Helios aanstuurt, de paneelgeometrie en hoe actuatorposities naar paneelhoeken worden omgerekend.",
+        "mapping_section": "Omrekening en terugkoppeling",
+        "relays_title": "{name}: twee relais (op tijd)",
+        "relays_desc": "Het open- en dicht-relais, hun afteltijden als hardwarebeveiliging, de volledige looptijden en de paneelhoek aan beide uiteinden. De minimale en maximale hoek moeten tussen de twee eindhoeken liggen.",
+        "advanced_section": "Homen, timing en slagtabel",
+        "positions_title": "{name}: posities",
+        "positions_desc": "Elke hoek hier blijft tussen de zachte grenzen, {min}\u00b0 en {max}\u00b0: het paneel gaat nooit voorbij een grens. Voorgestelde seizoenshoeken voor breedtegraad {latitude}\u00b0: winter {winter}\u00b0, zomer {summer}\u00b0 (ongeveer breedtegraad + 15 en breedtegraad - 35, binnen de grenzen).",
+        "clamp": "Blijft binnen de zachte grenzen, {min}\u00b0 tot {max}\u00b0.",
+        "winter": "Seizoensstrategie, bij de winterzonnewende. Steiler dan zomer: ongeveer breedtegraad + 15.",
+        "summer": "Seizoensstrategie, bij de zomerzonnewende: ongeveer breedtegraad - 35. Gelijk aan winter betekent een vlakke curve.",
+        "calibration_relays": "Met een kalibratietabel: hoek:slag%-paren (0 = volledig dicht), bijv. 10:0, 20:40, 30:75, 40:100.",
+        "mapping_relays": "Lineair rekent de slag om tussen de twee eindhoeken. Een tabel is voor niet-lineaire constructies.",
+    },
+}
+ERRORS["en"].update(
+    {
+        "outside_limits": "Outside the soft limits ({min}\u00b0 to {max}\u00b0). The panel never goes beyond a limit, so it would stop at the nearest one. Enter an angle within the limits.",
+        "season_flat": "The winter and summer angles are equal, so the seasonal curve is flat. Suggested for latitude {latitude}\u00b0: winter {winter}\u00b0, summer {summer}\u00b0. Submit again to keep them equal.",
+    }
+)
+ERRORS["nl"].update(
+    {
+        "outside_limits": "Buiten de zachte grenzen ({min}\u00b0 tot {max}\u00b0). Het paneel gaat nooit voorbij een grens en zou bij de dichtstbijzijnde stoppen. Vul een hoek binnen de grenzen in.",
+        "season_flat": "De winter- en zomerhoek zijn gelijk, dus de seizoenscurve is vlak. Voorstel voor breedtegraad {latitude}\u00b0: winter {winter}\u00b0, zomer {summer}\u00b0. Bevestig opnieuw om ze gelijk te houden.",
+    }
+)
+
+
+def _labels(lang: str) -> tuple[dict, dict]:
+    data = dict(PANEL[lang])
+    desc = dict(PANEL_DESC[lang])
+    for _name, d, dd in SECTIONS[lang].values():
+        data.update(d)
+        desc.update(dd)
+    return data, desc
+
+
+def _pick(src: dict, keys) -> dict:
+    return {k: src[k] for k in keys if k in src}
+
+
+def type_step(lang: str, title: str, desc: str) -> dict:
+    data, dd = _labels(lang)
+    keys = ("name", "actuator_type")
+    return {
         "title": title,
-        "data": PANEL[lang],
-        "data_description": PANEL_DESC[lang],
-        "sections": {
-            key: {"name": name, "data": data, "data_description": dd}
-            for key, (name, data, dd) in SECTIONS[lang].items()
+        "description": desc,
+        "data": _pick(data, keys),
+        "data_description": _pick(dd, keys),
+    }
+
+
+def panel_steps(lang: str) -> dict:
+    """Steps 2 and 3, the same in every flow."""
+    st = STEPS[lang]
+    data, dd = _labels(lang)
+    relay_dd = {
+        **dd,
+        "mapping": st["mapping_relays"],
+        "calibration": st["calibration_relays"],
+    }
+    pos_dd = {
+        **{k: (dd.get(k, "") + " " + st["clamp"]).strip() for k in POSITIONS[:6]},
+        "winter_angle": st["winter"],
+        "summer_angle": st["summer"],
+        "season_weight": dd["season_weight"],
+    }
+    pv = SECTIONS[lang]["pv"]
+    entity_main = ("actuator_entity", *GEOMETRY)
+    mapping = SECTIONS[lang]["mapping_feedback"]
+    return {
+        "entity": {
+            "title": st["entity_title"],
+            "description": st["entity_desc"],
+            "data": _pick(data, entity_main),
+            "data_description": _pick(dd, entity_main),
+            "sections": {
+                "mapping_feedback": {
+                    "name": st["mapping_section"],
+                    "data": mapping[1],
+                    "data_description": mapping[2],
+                }
+            },
+        },
+        "relays": {
+            "title": st["relays_title"],
+            "description": st["relays_desc"],
+            "data": _pick(data, (*RELAY_MAIN, *GEOMETRY)),
+            "data_description": _pick(relay_dd, (*RELAY_MAIN, *GEOMETRY)),
+            "sections": {
+                "relay_advanced": {
+                    "name": st["advanced_section"],
+                    "data": _pick(data, RELAY_ADVANCED),
+                    "data_description": _pick(relay_dd, RELAY_ADVANCED),
+                }
+            },
+        },
+        "positions": {
+            "title": st["positions_title"],
+            "description": st["positions_desc"],
+            "data": _pick(data, POSITIONS),
+            "data_description": pos_dd,
+            "sections": {
+                "pv": {"name": pv[0], "data": pv[1], "data_description": pv[2]}
+            },
         },
     }
-    if desc:
-        step["description"] = desc
-    return step
 
 
 def build(lang: str) -> dict:
@@ -773,7 +927,10 @@ def build(lang: str) -> dict:
                     "data": site_data,
                     "data_description": SITE_DESC[lang],
                 },
-                "panel": panel_step(lang, t["panel_title"], t["panel_desc"]),
+                "panel": type_step(
+                    lang, STEPS[lang]["first_title"], STEPS[lang]["first_desc"]
+                ),
+                **panel_steps(lang),
                 "reconfigure": {
                     "title": t["reconf_title"],
                     "data": reconf_data,
@@ -791,12 +948,17 @@ def build(lang: str) -> dict:
                 "initiate_flow": {"user": t["add_panel"]},
                 "entry_type": t["panel_type"],
                 "step": {
-                    "user": panel_step(lang, t["panel_user_title"], None),
+                    "user": type_step(
+                        lang, STEPS[lang]["add_title"], STEPS[lang]["add_desc"]
+                    ),
+                    **panel_steps(lang),
                     "reconfigure": {
                         "title": tr["menu_title"],
                         "menu_options": tr["menu"],
                     },
-                    "settings": panel_step(lang, t["panel_reconf_title"], None),
+                    "settings": type_step(
+                        lang, STEPS[lang]["change_title"], STEPS[lang]["change_desc"]
+                    ),
                     "travel": {
                         "title": tr["travel"][0],
                         "description": tr["travel"][1],

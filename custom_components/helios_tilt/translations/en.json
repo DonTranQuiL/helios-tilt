@@ -20,63 +20,39 @@
       },
       "panel": {
         "title": "First panel",
+        "description": "One mount driven by one actuator. Name it and choose how it is driven; the next step asks only for that type's settings. Add more panels later from the integration page.",
         "data": {
           "name": "Panel name",
+          "actuator_type": "Actuator type"
+        },
+        "data_description": {
+          "actuator_type": "An existing entity (cover, number or script), or two relays (open + close) driving a dumb actuator by time."
+        }
+      },
+      "entity": {
+        "title": "{name}: actuator entity",
+        "description": "The entity Helios commands, the panel geometry, and how actuator positions map to panel angles.",
+        "data": {
           "actuator_entity": "Actuator",
           "axis": "Axis",
           "azimuth": "Azimuth",
           "min_angle": "Minimum angle",
           "max_angle": "Maximum angle",
           "step": "Step",
-          "strategy": "Strategy",
-          "actuator_type": "Actuator type"
+          "strategy": "Strategy"
         },
         "data_description": {
-          "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables). Only for the entity type.",
+          "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables).",
           "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
           "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
           "min_angle": "Soft limit, never commanded below this.",
           "max_angle": "Soft limit, never commanded above this.",
           "step": "Targets are rounded to this step (0 = no rounding).",
-          "strategy": "How the angle is chosen in automatic mode.",
-          "actuator_type": "An existing entity (cover, number or script), or two relays (open + close) driving a dumb actuator by time."
+          "strategy": "How the angle is chosen in automatic mode."
         },
         "sections": {
-          "relays": {
-            "name": "Two relays (timed)",
-            "data": {
-              "open_switch": "Open relay (extends)",
-              "close_switch": "Close relay (retracts)",
-              "open_countdown": "Open relay countdown",
-              "close_countdown": "Close relay countdown",
-              "open_time": "Full open time",
-              "close_time": "Full close time",
-              "angle_closed": "Panel angle when fully closed",
-              "angle_open": "Panel angle when fully open",
-              "start_delay": "Start delay",
-              "home_overrun": "Homing overrun",
-              "reverse_delay": "Direction change pause",
-              "home_after_moves": "Home after this many moves",
-              "home_at_night": "Home at the night park",
-              "home_end": "Home against"
-            },
-            "data_description": {
-              "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.NAME_l1). The actuator must have its own limit switches.",
-              "close_switch": "Switch that makes it retract (switch.NAME_l2). Never both on: Helios switches the other one off first.",
-              "open_countdown": "Optional, e.g. number.NAME_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
-              "close_countdown": "Optional, e.g. number.NAME_countdown_l2.",
-              "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
-              "close_time": "Seconds from fully open to fully closed (often different).",
-              "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
-              "start_delay": "Seconds the motor needs before it moves. Usually 0.",
-              "home_overrun": "Runs to an end stop keep going this % of the travel time longer, so the estimate re-syncs.",
-              "reverse_delay": "Pause after a run before going the other way.",
-              "home_after_moves": "Drift builds up with every move; home again after this many moves (0 = only when needed).",
-              "home_at_night": "Drive into the home end stop before the night park."
-            }
-          },
           "mapping_feedback": {
-            "name": "Actuator mapping and feedback",
+            "name": "Mapping and feedback",
             "data": {
               "mapping": "Mapping",
               "position_at_min": "Position at minimum angle",
@@ -92,25 +68,94 @@
               "feedback_entity": "Optional. Without it the cover position is used, or an estimate from the travel time.",
               "travel_time": "Seconds from minimum to maximum. Used for estimates and the stuck check."
             }
-          },
-          "positions": {
-            "name": "Positions and seasonal curve",
+          }
+        }
+      },
+      "relays": {
+        "title": "{name}: two relays (timed)",
+        "description": "The open and close relay, their countdowns as a hardware fail-safe, the full travel times and the panel angle at both ends. The minimum and maximum angle must lie between the two end angles.",
+        "data": {
+          "open_switch": "Open relay (extends)",
+          "close_switch": "Close relay (retracts)",
+          "open_countdown": "Open relay countdown",
+          "close_countdown": "Close relay countdown",
+          "open_time": "Full open time",
+          "close_time": "Full close time",
+          "angle_closed": "Panel angle when fully closed",
+          "angle_open": "Panel angle when fully open",
+          "axis": "Axis",
+          "azimuth": "Azimuth",
+          "min_angle": "Minimum angle",
+          "max_angle": "Maximum angle",
+          "step": "Step",
+          "strategy": "Strategy"
+        },
+        "data_description": {
+          "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.NAME_l1). The actuator must have its own limit switches.",
+          "close_switch": "Switch that makes it retract (switch.NAME_l2). Never both on: Helios switches the other one off first.",
+          "open_countdown": "Optional, e.g. number.NAME_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
+          "close_countdown": "Optional, e.g. number.NAME_countdown_l2.",
+          "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
+          "close_time": "Seconds from fully open to fully closed (often different).",
+          "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
+          "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
+          "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
+          "min_angle": "Soft limit, never commanded below this.",
+          "max_angle": "Soft limit, never commanded above this.",
+          "step": "Targets are rounded to this step (0 = no rounding).",
+          "strategy": "How the angle is chosen in automatic mode."
+        },
+        "sections": {
+          "relay_advanced": {
+            "name": "Homing, timing and stroke table",
             "data": {
-              "stow_angle": "Stow angle (wind/storm)",
-              "night_angle": "Night park angle",
-              "diffuse_angle": "Cloudy (diffuse) angle",
-              "snow_angle": "Snow shedding angle",
-              "rain_angle": "Heavy rain angle",
-              "frost_angle": "Frost angle",
-              "winter_angle": "Winter angle",
-              "summer_angle": "Summer angle",
-              "season_weight": "Season weight"
+              "start_delay": "Start delay",
+              "home_overrun": "Homing overrun",
+              "reverse_delay": "Direction change pause",
+              "home_after_moves": "Home after this many moves",
+              "home_at_night": "Home at the night park",
+              "home_end": "Home against",
+              "mapping": "Mapping",
+              "calibration": "Calibration table"
             },
             "data_description": {
-              "stow_angle": "Lowest wind load for your mount, usually flat.",
-              "season_weight": "Seasonal strategy: 50 is a plain cosine, higher stays at the winter angle longer."
+              "start_delay": "Seconds the motor needs before it moves. Usually 0.",
+              "home_overrun": "Runs to an end stop keep going this % of the travel time longer, so the estimate re-syncs.",
+              "reverse_delay": "Pause after a run before going the other way.",
+              "home_after_moves": "Drift builds up with every move; home again after this many moves (0 = only when needed).",
+              "home_at_night": "Drive into the home end stop before the night park.",
+              "mapping": "Linear maps the stroke between the two end angles. A table is for non-linear mounts.",
+              "calibration": "With a calibration table: angle:stroke% pairs (0 = fully closed), e.g. 10:0, 20:40, 30:75, 40:100."
             }
-          },
+          }
+        }
+      },
+      "positions": {
+        "title": "{name}: positions",
+        "description": "Every angle here is kept between the soft limits, {min}° and {max}°: the panel never goes beyond a limit. Suggested seasonal angles for latitude {latitude}°: winter {winter}°, summer {summer}° (about latitude + 15 and latitude - 35, within the limits).",
+        "data": {
+          "stow_angle": "Stow angle (wind/storm)",
+          "night_angle": "Night park angle",
+          "diffuse_angle": "Cloudy (diffuse) angle",
+          "snow_angle": "Snow shedding angle",
+          "rain_angle": "Heavy rain angle",
+          "frost_angle": "Frost angle",
+          "winter_angle": "Winter angle",
+          "summer_angle": "Summer angle",
+          "season_weight": "Season weight"
+        },
+        "data_description": {
+          "stow_angle": "Lowest wind load for your mount, usually flat. Kept between the soft limits, {min}° to {max}°.",
+          "night_angle": "Kept between the soft limits, {min}° to {max}°.",
+          "diffuse_angle": "Kept between the soft limits, {min}° to {max}°.",
+          "snow_angle": "Kept between the soft limits, {min}° to {max}°.",
+          "rain_angle": "Kept between the soft limits, {min}° to {max}°.",
+          "frost_angle": "Kept between the soft limits, {min}° to {max}°.",
+          "winter_angle": "Seasonal strategy, at the winter solstice. Steeper than summer: about latitude + 15.",
+          "summer_angle": "Seasonal strategy, at the summer solstice: about latitude - 35. Equal to winter means a flat curve.",
+          "season_weight": "Seasonal strategy: 50 is a plain cosine, higher stays at the winter angle longer."
+        },
+        "sections": {
           "pv": {
             "name": "PV comparison (optional)",
             "data": {
@@ -121,8 +166,7 @@
               "pv_peak_power": "Peak power of the panels on this mount, for the actual-vs-model sensor."
             }
           }
-        },
-        "description": "One mount driven by one actuator. Add more panels later from the integration page."
+        }
       },
       "reconfigure": {
         "title": "Location and weather",
@@ -150,13 +194,15 @@
       "resume_above_stow": "The resume speed must be below the stow speed.",
       "storm_below_stow": "The storm speed must be at least the stow speed.",
       "actuator_required": "Choose the actuator entity, or pick the two relays type.",
-      "relays_required": "Choose both the open and the close relay (in the Two relays section).",
+      "relays_required": "Choose both the open and the close relay.",
       "same_relay": "The open and close relay must be different switches.",
       "same_countdown": "The two countdowns must be different entities.",
       "same_end_angles": "The angles at fully closed and fully open must differ.",
       "limits_outside_stroke": "The minimum and maximum angle must lie between the angles at fully closed and fully open.",
       "still_homing": "Still closing. Wait until it has closed fully and starts to open, then submit when it reaches the open end.",
-      "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off."
+      "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off.",
+      "outside_limits": "Outside the soft limits ({min}° to {max}°). The panel never goes beyond a limit, so it would stop at the nearest one. Enter an angle within the limits.",
+      "season_flat": "The winter and summer angles are equal, so the seasonal curve is flat. Suggested for latitude {latitude}°: winter {winter}°, summer {summer}°. Submit again to keep them equal."
     },
     "abort": {
       "already_configured": "This site is already set up.",
@@ -172,63 +218,39 @@
       "step": {
         "user": {
           "title": "Add a panel",
+          "description": "Name the panel and choose how it is driven. The next step asks only for that type's settings.",
           "data": {
             "name": "Panel name",
+            "actuator_type": "Actuator type"
+          },
+          "data_description": {
+            "actuator_type": "An existing entity (cover, number or script), or two relays (open + close) driving a dumb actuator by time."
+          }
+        },
+        "entity": {
+          "title": "{name}: actuator entity",
+          "description": "The entity Helios commands, the panel geometry, and how actuator positions map to panel angles.",
+          "data": {
             "actuator_entity": "Actuator",
             "axis": "Axis",
             "azimuth": "Azimuth",
             "min_angle": "Minimum angle",
             "max_angle": "Maximum angle",
             "step": "Step",
-            "strategy": "Strategy",
-            "actuator_type": "Actuator type"
+            "strategy": "Strategy"
           },
           "data_description": {
-            "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables). Only for the entity type.",
+            "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables).",
             "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
             "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
             "min_angle": "Soft limit, never commanded below this.",
             "max_angle": "Soft limit, never commanded above this.",
             "step": "Targets are rounded to this step (0 = no rounding).",
-            "strategy": "How the angle is chosen in automatic mode.",
-            "actuator_type": "An existing entity (cover, number or script), or two relays (open + close) driving a dumb actuator by time."
+            "strategy": "How the angle is chosen in automatic mode."
           },
           "sections": {
-            "relays": {
-              "name": "Two relays (timed)",
-              "data": {
-                "open_switch": "Open relay (extends)",
-                "close_switch": "Close relay (retracts)",
-                "open_countdown": "Open relay countdown",
-                "close_countdown": "Close relay countdown",
-                "open_time": "Full open time",
-                "close_time": "Full close time",
-                "angle_closed": "Panel angle when fully closed",
-                "angle_open": "Panel angle when fully open",
-                "start_delay": "Start delay",
-                "home_overrun": "Homing overrun",
-                "reverse_delay": "Direction change pause",
-                "home_after_moves": "Home after this many moves",
-                "home_at_night": "Home at the night park",
-                "home_end": "Home against"
-              },
-              "data_description": {
-                "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.NAME_l1). The actuator must have its own limit switches.",
-                "close_switch": "Switch that makes it retract (switch.NAME_l2). Never both on: Helios switches the other one off first.",
-                "open_countdown": "Optional, e.g. number.NAME_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
-                "close_countdown": "Optional, e.g. number.NAME_countdown_l2.",
-                "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
-                "close_time": "Seconds from fully open to fully closed (often different).",
-                "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
-                "start_delay": "Seconds the motor needs before it moves. Usually 0.",
-                "home_overrun": "Runs to an end stop keep going this % of the travel time longer, so the estimate re-syncs.",
-                "reverse_delay": "Pause after a run before going the other way.",
-                "home_after_moves": "Drift builds up with every move; home again after this many moves (0 = only when needed).",
-                "home_at_night": "Drive into the home end stop before the night park."
-              }
-            },
             "mapping_feedback": {
-              "name": "Actuator mapping and feedback",
+              "name": "Mapping and feedback",
               "data": {
                 "mapping": "Mapping",
                 "position_at_min": "Position at minimum angle",
@@ -244,25 +266,94 @@
                 "feedback_entity": "Optional. Without it the cover position is used, or an estimate from the travel time.",
                 "travel_time": "Seconds from minimum to maximum. Used for estimates and the stuck check."
               }
-            },
-            "positions": {
-              "name": "Positions and seasonal curve",
+            }
+          }
+        },
+        "relays": {
+          "title": "{name}: two relays (timed)",
+          "description": "The open and close relay, their countdowns as a hardware fail-safe, the full travel times and the panel angle at both ends. The minimum and maximum angle must lie between the two end angles.",
+          "data": {
+            "open_switch": "Open relay (extends)",
+            "close_switch": "Close relay (retracts)",
+            "open_countdown": "Open relay countdown",
+            "close_countdown": "Close relay countdown",
+            "open_time": "Full open time",
+            "close_time": "Full close time",
+            "angle_closed": "Panel angle when fully closed",
+            "angle_open": "Panel angle when fully open",
+            "axis": "Axis",
+            "azimuth": "Azimuth",
+            "min_angle": "Minimum angle",
+            "max_angle": "Maximum angle",
+            "step": "Step",
+            "strategy": "Strategy"
+          },
+          "data_description": {
+            "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.NAME_l1). The actuator must have its own limit switches.",
+            "close_switch": "Switch that makes it retract (switch.NAME_l2). Never both on: Helios switches the other one off first.",
+            "open_countdown": "Optional, e.g. number.NAME_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
+            "close_countdown": "Optional, e.g. number.NAME_countdown_l2.",
+            "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
+            "close_time": "Seconds from fully open to fully closed (often different).",
+            "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
+            "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
+            "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
+            "min_angle": "Soft limit, never commanded below this.",
+            "max_angle": "Soft limit, never commanded above this.",
+            "step": "Targets are rounded to this step (0 = no rounding).",
+            "strategy": "How the angle is chosen in automatic mode."
+          },
+          "sections": {
+            "relay_advanced": {
+              "name": "Homing, timing and stroke table",
               "data": {
-                "stow_angle": "Stow angle (wind/storm)",
-                "night_angle": "Night park angle",
-                "diffuse_angle": "Cloudy (diffuse) angle",
-                "snow_angle": "Snow shedding angle",
-                "rain_angle": "Heavy rain angle",
-                "frost_angle": "Frost angle",
-                "winter_angle": "Winter angle",
-                "summer_angle": "Summer angle",
-                "season_weight": "Season weight"
+                "start_delay": "Start delay",
+                "home_overrun": "Homing overrun",
+                "reverse_delay": "Direction change pause",
+                "home_after_moves": "Home after this many moves",
+                "home_at_night": "Home at the night park",
+                "home_end": "Home against",
+                "mapping": "Mapping",
+                "calibration": "Calibration table"
               },
               "data_description": {
-                "stow_angle": "Lowest wind load for your mount, usually flat.",
-                "season_weight": "Seasonal strategy: 50 is a plain cosine, higher stays at the winter angle longer."
+                "start_delay": "Seconds the motor needs before it moves. Usually 0.",
+                "home_overrun": "Runs to an end stop keep going this % of the travel time longer, so the estimate re-syncs.",
+                "reverse_delay": "Pause after a run before going the other way.",
+                "home_after_moves": "Drift builds up with every move; home again after this many moves (0 = only when needed).",
+                "home_at_night": "Drive into the home end stop before the night park.",
+                "mapping": "Linear maps the stroke between the two end angles. A table is for non-linear mounts.",
+                "calibration": "With a calibration table: angle:stroke% pairs (0 = fully closed), e.g. 10:0, 20:40, 30:75, 40:100."
               }
-            },
+            }
+          }
+        },
+        "positions": {
+          "title": "{name}: positions",
+          "description": "Every angle here is kept between the soft limits, {min}° and {max}°: the panel never goes beyond a limit. Suggested seasonal angles for latitude {latitude}°: winter {winter}°, summer {summer}° (about latitude + 15 and latitude - 35, within the limits).",
+          "data": {
+            "stow_angle": "Stow angle (wind/storm)",
+            "night_angle": "Night park angle",
+            "diffuse_angle": "Cloudy (diffuse) angle",
+            "snow_angle": "Snow shedding angle",
+            "rain_angle": "Heavy rain angle",
+            "frost_angle": "Frost angle",
+            "winter_angle": "Winter angle",
+            "summer_angle": "Summer angle",
+            "season_weight": "Season weight"
+          },
+          "data_description": {
+            "stow_angle": "Lowest wind load for your mount, usually flat. Kept between the soft limits, {min}° to {max}°.",
+            "night_angle": "Kept between the soft limits, {min}° to {max}°.",
+            "diffuse_angle": "Kept between the soft limits, {min}° to {max}°.",
+            "snow_angle": "Kept between the soft limits, {min}° to {max}°.",
+            "rain_angle": "Kept between the soft limits, {min}° to {max}°.",
+            "frost_angle": "Kept between the soft limits, {min}° to {max}°.",
+            "winter_angle": "Seasonal strategy, at the winter solstice. Steeper than summer: about latitude + 15.",
+            "summer_angle": "Seasonal strategy, at the summer solstice: about latitude - 35. Equal to winter means a flat curve.",
+            "season_weight": "Seasonal strategy: 50 is a plain cosine, higher stays at the winter angle longer."
+          },
+          "sections": {
             "pv": {
               "name": "PV comparison (optional)",
               "data": {
@@ -284,107 +375,13 @@
         },
         "settings": {
           "title": "Change panel",
+          "description": "Changing the actuator type starts that type's settings from the defaults.",
           "data": {
             "name": "Panel name",
-            "actuator_entity": "Actuator",
-            "axis": "Axis",
-            "azimuth": "Azimuth",
-            "min_angle": "Minimum angle",
-            "max_angle": "Maximum angle",
-            "step": "Step",
-            "strategy": "Strategy",
             "actuator_type": "Actuator type"
           },
           "data_description": {
-            "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables). Only for the entity type.",
-            "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
-            "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
-            "min_angle": "Soft limit, never commanded below this.",
-            "max_angle": "Soft limit, never commanded above this.",
-            "step": "Targets are rounded to this step (0 = no rounding).",
-            "strategy": "How the angle is chosen in automatic mode.",
             "actuator_type": "An existing entity (cover, number or script), or two relays (open + close) driving a dumb actuator by time."
-          },
-          "sections": {
-            "relays": {
-              "name": "Two relays (timed)",
-              "data": {
-                "open_switch": "Open relay (extends)",
-                "close_switch": "Close relay (retracts)",
-                "open_countdown": "Open relay countdown",
-                "close_countdown": "Close relay countdown",
-                "open_time": "Full open time",
-                "close_time": "Full close time",
-                "angle_closed": "Panel angle when fully closed",
-                "angle_open": "Panel angle when fully open",
-                "start_delay": "Start delay",
-                "home_overrun": "Homing overrun",
-                "reverse_delay": "Direction change pause",
-                "home_after_moves": "Home after this many moves",
-                "home_at_night": "Home at the night park",
-                "home_end": "Home against"
-              },
-              "data_description": {
-                "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.NAME_l1). The actuator must have its own limit switches.",
-                "close_switch": "Switch that makes it retract (switch.NAME_l2). Never both on: Helios switches the other one off first.",
-                "open_countdown": "Optional, e.g. number.NAME_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
-                "close_countdown": "Optional, e.g. number.NAME_countdown_l2.",
-                "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
-                "close_time": "Seconds from fully open to fully closed (often different).",
-                "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
-                "start_delay": "Seconds the motor needs before it moves. Usually 0.",
-                "home_overrun": "Runs to an end stop keep going this % of the travel time longer, so the estimate re-syncs.",
-                "reverse_delay": "Pause after a run before going the other way.",
-                "home_after_moves": "Drift builds up with every move; home again after this many moves (0 = only when needed).",
-                "home_at_night": "Drive into the home end stop before the night park."
-              }
-            },
-            "mapping_feedback": {
-              "name": "Actuator mapping and feedback",
-              "data": {
-                "mapping": "Mapping",
-                "position_at_min": "Position at minimum angle",
-                "position_at_max": "Position at maximum angle",
-                "calibration": "Calibration table",
-                "feedback_entity": "Feedback sensor",
-                "feedback_kind": "Feedback reports",
-                "travel_time": "Full stroke travel time"
-              },
-              "data_description": {
-                "position_at_min": "Swap the two positions to invert the actuator.",
-                "calibration": "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100. Two relays: angle:stroke% (0 = fully closed).",
-                "feedback_entity": "Optional. Without it the cover position is used, or an estimate from the travel time.",
-                "travel_time": "Seconds from minimum to maximum. Used for estimates and the stuck check."
-              }
-            },
-            "positions": {
-              "name": "Positions and seasonal curve",
-              "data": {
-                "stow_angle": "Stow angle (wind/storm)",
-                "night_angle": "Night park angle",
-                "diffuse_angle": "Cloudy (diffuse) angle",
-                "snow_angle": "Snow shedding angle",
-                "rain_angle": "Heavy rain angle",
-                "frost_angle": "Frost angle",
-                "winter_angle": "Winter angle",
-                "summer_angle": "Summer angle",
-                "season_weight": "Season weight"
-              },
-              "data_description": {
-                "stow_angle": "Lowest wind load for your mount, usually flat.",
-                "season_weight": "Seasonal strategy: 50 is a plain cosine, higher stays at the winter angle longer."
-              }
-            },
-            "pv": {
-              "name": "PV comparison (optional)",
-              "data": {
-                "pv_power_entity": "PV power sensor",
-                "pv_peak_power": "PV peak power"
-              },
-              "data_description": {
-                "pv_peak_power": "Peak power of the panels on this mount, for the actual-vs-model sensor."
-              }
-            }
           }
         },
         "travel": {
@@ -426,13 +423,15 @@
         "resume_above_stow": "The resume speed must be below the stow speed.",
         "storm_below_stow": "The storm speed must be at least the stow speed.",
         "actuator_required": "Choose the actuator entity, or pick the two relays type.",
-        "relays_required": "Choose both the open and the close relay (in the Two relays section).",
+        "relays_required": "Choose both the open and the close relay.",
         "same_relay": "The open and close relay must be different switches.",
         "same_countdown": "The two countdowns must be different entities.",
         "same_end_angles": "The angles at fully closed and fully open must differ.",
         "limits_outside_stroke": "The minimum and maximum angle must lie between the angles at fully closed and fully open.",
         "still_homing": "Still closing. Wait until it has closed fully and starts to open, then submit when it reaches the open end.",
-        "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off."
+        "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off.",
+        "outside_limits": "Outside the soft limits ({min}° to {max}°). The panel never goes beyond a limit, so it would stop at the nearest one. Enter an angle within the limits.",
+        "season_flat": "The winter and summer angles are equal, so the seasonal curve is flat. Suggested for latitude {latitude}°: winter {winter}°, summer {summer}°. Submit again to keep them equal."
       },
       "abort": {
         "reconfigure_successful": "Saved.",
@@ -483,13 +482,15 @@
       "resume_above_stow": "The resume speed must be below the stow speed.",
       "storm_below_stow": "The storm speed must be at least the stow speed.",
       "actuator_required": "Choose the actuator entity, or pick the two relays type.",
-      "relays_required": "Choose both the open and the close relay (in the Two relays section).",
+      "relays_required": "Choose both the open and the close relay.",
       "same_relay": "The open and close relay must be different switches.",
       "same_countdown": "The two countdowns must be different entities.",
       "same_end_angles": "The angles at fully closed and fully open must differ.",
       "limits_outside_stroke": "The minimum and maximum angle must lie between the angles at fully closed and fully open.",
       "still_homing": "Still closing. Wait until it has closed fully and starts to open, then submit when it reaches the open end.",
-      "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off."
+      "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off.",
+      "outside_limits": "Outside the soft limits ({min}° to {max}°). The panel never goes beyond a limit, so it would stop at the nearest one. Enter an angle within the limits.",
+      "season_flat": "The winter and summer angles are equal, so the seasonal curve is flat. Suggested for latitude {latitude}°: winter {winter}°, summer {summer}°. Submit again to keep them equal."
     }
   },
   "entity": {

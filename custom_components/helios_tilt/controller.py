@@ -234,6 +234,10 @@ class PanelConfig:
             if f.type in ("float", float) and not isinstance(value, bool):
                 value = float(value)
             values[f.name] = value
+        if values.get("actuator_type") == ACTUATOR_RELAYS:
+            # Never command (or watch) a generic actuator entity on relay panels.
+            values["actuator_entity"] = ""
+            values["feedback_entity"] = None
         return cls(**values)
 
     def build_mapping(self) -> AngleMapping:
@@ -514,6 +518,7 @@ class HeliosSite:
                 panel.cfg.pv_power_entity,
             }
         entities.discard(None)
+        entities.discard("")
         entities.discard("")
         self._unsubs.append(
             async_track_state_change_event(

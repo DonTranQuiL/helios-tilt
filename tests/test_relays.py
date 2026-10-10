@@ -539,66 +539,104 @@ async def test_relay_services_need_a_relay_panel(
 # ---- config flow ------------------------------------------------------------------------
 
 
+def test_positions_outside_the_limits_are_refused() -> None:
+    """Backstop for the selector limits, and the latitude suggestion."""
+    from custom_components.helios_tilt.config_flow import (
+        _validate_positions,
+        season_suggestion,
+    )
+    from custom_components.helios_tilt.const import PANEL_DEFAULTS
+
+    data = {**PANEL_DEFAULTS, "min_angle": 10, "max_angle": 40, "stow_angle": 10}
+    data.update({k: 20 for k in ("night_angle", "diffuse_angle", "snow_angle")})
+    data.update({k: 20 for k in ("rain_angle", "frost_angle", "winter_angle")})
+    data["summer_angle"] = 15
+    assert _validate_positions(data) == {}
+    assert _validate_positions({**data, "stow_angle": 0}) == {
+        "stow_angle": "outside_limits"
+    }
+    assert season_suggestion(52.37, 0, 90) == (67, 17)
+    assert season_suggestion(-33.9, 0, 90) == (49, 0)  # southern hemisphere: abs
+    assert season_suggestion(52.37, 10, 40) == (40, 17)
+    assert season_suggestion(20, 10, 40) == (35, 10)
+
+
 async def test_add_relay_panel_validates(hass: HomeAssistant, setup_site) -> None:
-    """A relay panel needs two different relays and a sane stroke."""
+    """The user's attic window: ZG-2002-RF relays, 10..40 deg, in three steps."""
     from homeassistant import config_entries
-    from homeassistant.data_entry_flow import FlowResultType
+    from homeassistant.data_entry_flow import FlowResultType, InvalidData
 
     from custom_components.helios_tilt.const import SUBENTRY_PANEL
 
-    from .test_config_flow import panel_input
+    from .test_config_flow import relays_input, type_input
 
     entry = await setup_site()
-    for entity_id in ("switch.attic_l1", "switch.attic_l2"):
+    for entity_id in ("switch.windowswitch_l1", "switch.windowswitch_l2"):
         hass.states.async_set(entity_id, "off")
-    for entity_id in ("number.attic_countdown_l1", "number.attic_countdown_l2"):
+    for entity_id in (
+        "number.windowswitch_countdown_l1",
+        "number.windowswitch_countdown_l2",
+    ):
         hass.states.async_set(entity_id, "0")
+    good = {
+        "open_switch": "switch.windowswitch_l1",
+        "close_switch": "switch.windowswitch_l2",
+        "open_countdown": "number.windowswitch_countdown_l1",
+        "close_countdown": "number.windowswitch_countdown_l2",
+        "angle_closed": 10,
+        "angle_open": 40,
+        "min_angle": 10,
+        "max_angle": 40,
+    }
 
     def form(**kw):
-        data = panel_input(**{"name": "Attic", "actuator_type": "relays", **kw})
-        data.pop("actuator_entity")
-        return data
+        return relays_input(**{**good, **kw})
 
     result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, SUBENTRY_PANEL), context={"source": config_entries.SOURCE_USER}
     )
     flow = result["flow_id"]
     configure = hass.config_entries.subentries.async_configure
-    result = await configure(flow, form())
-    assert result["errors"] == {"base": "relays_required"}
+    assert {str(k) for k in result["data_schema"].schema} == {"name", "actuator_type"}
+    result = await configure(flow, type_input("Attic", "relays"))
+    assert result["step_id"] == "relays"
+    schema = {str(k) for k in result["data_schema"].schema}
+    assert "actuator_entity" not in schema
+    assert "mapping_feedback" not in schema
+    assert {"open_switch", "close_countdown", "angle_open", "relay_advanced"} <= schema
+    with pytest.raises(InvalidData):
+        await configure(flow, form(open_switch=None))
+    result = await configure(flow, form(close_switch="switch.windowswitch_l1"))
+    assert result["errors"] == {"close_switch": "same_relay"}
     result = await configure(
-        flow, form(open_switch="switch.attic_l1", close_switch="switch.attic_l1")
+        flow, form(close_countdown="number.windowswitch_countdown_l1")
     )
-    assert result["errors"] == {"base": "same_relay"}
-    good = {"open_switch": "switch.attic_l1", "close_switch": "switch.attic_l2"}
-    result = await configure(
-        flow,
-        form(
-            **good,
-            open_countdown="number.attic_countdown_l1",
-            close_countdown="number.attic_countdown_l1",
-        ),
-    )
-    assert result["errors"] == {"base": "same_countdown"}
-    result = await configure(flow, form(**good, angle_open=0))
-    assert result["errors"] == {"base": "same_end_angles"}
-    result = await configure(flow, form(**good, angle_open=40))
+    assert result["errors"] == {"close_countdown": "same_countdown"}
+    result = await configure(flow, form(angle_open=10))
+    assert result["errors"] == {"angle_open": "same_end_angles"}
+    result = await configure(flow, form(max_angle=60))
     assert result["errors"] == {"base": "limits_outside_stroke"}
-    result = await configure(
-        flow,
-        form(
-            **good,
-            open_countdown="number.attic_countdown_l1",
-            close_countdown="number.attic_countdown_l2",
-        ),
-    )
+    result = await configure(flow, form())
+    assert result["step_id"] == "positions"
+    defaults = {
+        str(k): k.default()
+        for k in result["data_schema"].schema
+        if hasattr(k, "default") and callable(k.default)
+    }
+    assert defaults["stow_angle"] == 10  # 0 clamped to the minimum
+    assert defaults["snow_angle"] == 40
+    assert defaults["winter_angle"] == 40  # 52.4 + 15, clamped
+    assert defaults["summer_angle"] == 17
+    defaults.pop("pv", None)
+    result = await configure(flow, {**defaults, "pv": {"pv_peak_power": 0}})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
     sub = next(s for s in entry.subentries.values() if s.title == "Attic")
-    assert sub.unique_id == "switch.attic_l1"
+    assert sub.unique_id == "switch.windowswitch_l1"
     assert sub.data["actuator_type"] == "relays"
     assert "actuator_entity" not in sub.data
-    assert sub.data["close_countdown"] == "number.attic_countdown_l2"
+    assert sub.data["close_countdown"] == "number.windowswitch_countdown_l2"
+    assert sub.data["min_angle"] == 10 and sub.data["stow_angle"] == 10
     assert hass.states.get("button.attic_home_now") is not None
     assert hass.states.get("binary_sensor.attic_position_uncertain") is not None
     # The entity panel has no relay keys, and needs its actuator.

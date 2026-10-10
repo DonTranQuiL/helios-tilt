@@ -100,50 +100,6 @@ from .const import (
 )
 from .controller import PanelConfig
 
-SECTION_RELAYS = "relays"
-SECTION_MAPPING = "mapping_feedback"
-SECTION_POSITIONS = "positions"
-SECTION_PV = "pv"
-SECTIONS = (SECTION_RELAYS, SECTION_MAPPING, SECTION_POSITIONS, SECTION_PV)
-
-RELAY_KEYS = (
-    CONF_OPEN_SWITCH,
-    CONF_CLOSE_SWITCH,
-    CONF_OPEN_COUNTDOWN,
-    CONF_CLOSE_COUNTDOWN,
-    CONF_OPEN_TIME,
-    CONF_CLOSE_TIME,
-    CONF_ANGLE_CLOSED,
-    CONF_ANGLE_OPEN,
-    CONF_START_DELAY,
-    CONF_HOME_OVERRUN,
-    CONF_REVERSE_DELAY,
-    CONF_HOME_AFTER_MOVES,
-    CONF_HOME_AT_NIGHT,
-    CONF_HOME_END,
-)
-
-MAPPING_KEYS = (
-    CONF_MAPPING,
-    CONF_POS_AT_MIN,
-    CONF_POS_AT_MAX,
-    CONF_CALIBRATION,
-    CONF_FEEDBACK,
-    CONF_FEEDBACK_KIND,
-    CONF_TRAVEL_TIME,
-)
-POSITION_KEYS = (
-    CONF_STOW_ANGLE,
-    CONF_NIGHT_ANGLE,
-    CONF_DIFFUSE_ANGLE,
-    CONF_SNOW_ANGLE,
-    CONF_RAIN_ANGLE,
-    CONF_FROST_ANGLE,
-    CONF_WINTER_ANGLE,
-    CONF_SUMMER_ANGLE,
-    CONF_SEASON_WEIGHT,
-)
-PV_KEYS = (CONF_PV_POWER, CONF_PV_PEAK)
 ATTR_HOMING = "homing_seconds"
 
 
@@ -280,42 +236,157 @@ def _validate_thresholds(user_input: dict[str, Any]) -> dict[str, str]:
 
 
 # ---- panel ---------------------------------------------------------------------
+#
+# Three steps: (1) name and actuator type, (2) the fields for that type plus the
+# geometry, (3) positions (defaults clamped to the limits) and the PV comparison.
+
+STEP_ENTITY = "entity"
+STEP_RELAYS = "relays"
+STEP_POSITIONS = "positions"
+SECTION_RELAY_ADVANCED = "relay_advanced"
+SECTION_MAPPING = "mapping_feedback"
+SECTION_PV = "pv"
+SECTIONS = (SECTION_RELAY_ADVANCED, SECTION_MAPPING, SECTION_PV)
+
+RELAY_KEYS = (
+    CONF_OPEN_SWITCH,
+    CONF_CLOSE_SWITCH,
+    CONF_OPEN_COUNTDOWN,
+    CONF_CLOSE_COUNTDOWN,
+    CONF_OPEN_TIME,
+    CONF_CLOSE_TIME,
+    CONF_ANGLE_CLOSED,
+    CONF_ANGLE_OPEN,
+    CONF_START_DELAY,
+    CONF_HOME_OVERRUN,
+    CONF_REVERSE_DELAY,
+    CONF_HOME_AFTER_MOVES,
+    CONF_HOME_AT_NIGHT,
+    CONF_HOME_END,
+)
+ENTITY_KEYS = (
+    CONF_ACTUATOR,
+    CONF_POS_AT_MIN,
+    CONF_POS_AT_MAX,
+    CONF_FEEDBACK,
+    CONF_FEEDBACK_KIND,
+    CONF_TRAVEL_TIME,
+)
+ANGLE_POSITION_KEYS = (
+    CONF_STOW_ANGLE,
+    CONF_NIGHT_ANGLE,
+    CONF_DIFFUSE_ANGLE,
+    CONF_SNOW_ANGLE,
+    CONF_RAIN_ANGLE,
+    CONF_FROST_ANGLE,
+    CONF_WINTER_ANGLE,
+    CONF_SUMMER_ANGLE,
+)
+OPTIONAL_KEYS = (
+    CONF_FEEDBACK,
+    CONF_PV_POWER,
+    CONF_CALIBRATION,
+    CONF_ACTUATOR,
+    CONF_OPEN_SWITCH,
+    CONF_CLOSE_SWITCH,
+    CONF_OPEN_COUNTDOWN,
+    CONF_CLOSE_COUNTDOWN,
+)
 
 
-def _panel_schema(values: dict[str, Any], with_name: bool) -> vol.Schema:
+def _type_schema(values: dict[str, Any]) -> vol.Schema:
     v = {**PANEL_DEFAULTS, **values}
-    fields: dict[Any, Any] = {}
-    if with_name:
-        fields[vol.Required(CONF_NAME, default=v.get(CONF_NAME, "Panel"))] = str
-    fields.update(
+    return vol.Schema(
         {
+            vol.Required(CONF_NAME, default=v.get(CONF_NAME, "Panel")): str,
             vol.Required(CONF_ACTUATOR_TYPE, default=v[CONF_ACTUATOR_TYPE]): _choice(
                 ACTUATOR_TYPES, CONF_ACTUATOR_TYPE
             ),
-            _opt(CONF_ACTUATOR, v): selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain=["cover", "number", "input_number", "script"]
-                )
-            ),
-            vol.Required(CONF_AXIS, default=v[CONF_AXIS]): _choice(AXES, CONF_AXIS),
-            vol.Required(CONF_AZIMUTH, default=v[CONF_AZIMUTH]): _num(0, 359, 1, "°"),
-            vol.Required(CONF_MIN_ANGLE, default=v[CONF_MIN_ANGLE]): _angle(),
-            vol.Required(CONF_MAX_ANGLE, default=v[CONF_MAX_ANGLE]): _angle(),
-            vol.Required(CONF_STEP, default=v[CONF_STEP]): _num(0, 30, 0.5, "°"),
-            vol.Required(CONF_STRATEGY, default=v[CONF_STRATEGY]): _choice(
-                STRATEGIES, CONF_STRATEGY
-            ),
         }
     )
+
+
+def _geometry(v: dict[str, Any]) -> dict[Any, Any]:
+    return {
+        vol.Required(CONF_AXIS, default=v[CONF_AXIS]): _choice(AXES, CONF_AXIS),
+        vol.Required(CONF_AZIMUTH, default=v[CONF_AZIMUTH]): _num(0, 359, 1, "°"),
+        vol.Required(CONF_MIN_ANGLE, default=v[CONF_MIN_ANGLE]): _angle(),
+        vol.Required(CONF_MAX_ANGLE, default=v[CONF_MAX_ANGLE]): _angle(),
+        vol.Required(CONF_STEP, default=v[CONF_STEP]): _num(0, 30, 0.5, "°"),
+        vol.Required(CONF_STRATEGY, default=v[CONF_STRATEGY]): _choice(
+            STRATEGIES, CONF_STRATEGY
+        ),
+    }
+
+
+def _calibration_field(v: dict[str, Any]) -> dict[Any, Any]:
+    return {
+        vol.Required(CONF_MAPPING, default=v[CONF_MAPPING]): _choice(
+            [MAPPING_LINEAR, MAPPING_TABLE], CONF_MAPPING
+        ),
+        _opt(CONF_CALIBRATION, v): selector.TextSelector(
+            selector.TextSelectorConfig(multiline=True)
+        ),
+    }
+
+
+def _entity_schema(values: dict[str, Any]) -> vol.Schema:
+    """A cover, number or script: the entity and how positions map to angles."""
+    v = {**PANEL_DEFAULTS, **values}
+    fields: dict[Any, Any] = {
+        (
+            vol.Required(CONF_ACTUATOR, default=v[CONF_ACTUATOR])
+            if v.get(CONF_ACTUATOR)
+            else vol.Required(CONF_ACTUATOR)
+        ): selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain=["cover", "number", "input_number", "script"]
+            )
+        ),
+        **_geometry(v),
+    }
+    mapping: dict[Any, Any] = {
+        **_calibration_field(v),
+        vol.Required(CONF_POS_AT_MIN, default=v[CONF_POS_AT_MIN]): _num(
+            -10000, 10000, 0.1
+        ),
+        vol.Required(CONF_POS_AT_MAX, default=v[CONF_POS_AT_MAX]): _num(
+            -10000, 10000, 0.1
+        ),
+        _opt(CONF_FEEDBACK, v): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["sensor", "number", "input_number"])
+        ),
+        vol.Required(CONF_FEEDBACK_KIND, default=v[CONF_FEEDBACK_KIND]): _choice(
+            [FEEDBACK_POSITION, FEEDBACK_ANGLE], CONF_FEEDBACK_KIND
+        ),
+        vol.Required(CONF_TRAVEL_TIME, default=v[CONF_TRAVEL_TIME]): _num(
+            1, 3600, 1, "s"
+        ),
+    }
+    fields[vol.Required(SECTION_MAPPING)] = section(
+        vol.Schema(mapping), {"collapsed": False}
+    )
+    return vol.Schema(fields)
+
+
+def _relays_schema(values: dict[str, Any]) -> vol.Schema:
+    """Two relays: the switches, countdowns, travel times and end angles."""
+    v = {**PANEL_DEFAULTS, **values}
     switch = selector.EntitySelector(
         selector.EntitySelectorConfig(domain=["switch", "input_boolean"])
     )
     countdown = selector.EntitySelector(
         selector.EntitySelectorConfig(domain=["number", "input_number"])
     )
-    relays: dict[Any, Any] = {
-        _opt(CONF_OPEN_SWITCH, v): switch,
-        _opt(CONF_CLOSE_SWITCH, v): switch,
+
+    def req(key: str) -> vol.Marker:
+        if v.get(key):
+            return vol.Required(key, default=v[key])
+        return vol.Required(key)
+
+    fields: dict[Any, Any] = {
+        req(CONF_OPEN_SWITCH): switch,
+        req(CONF_CLOSE_SWITCH): switch,
         _opt(CONF_OPEN_COUNTDOWN, v): countdown,
         _opt(CONF_CLOSE_COUNTDOWN, v): countdown,
         vol.Required(CONF_OPEN_TIME, default=v[CONF_OPEN_TIME]): _num(1, 600, 0.1, "s"),
@@ -324,6 +395,9 @@ def _panel_schema(values: dict[str, Any], with_name: bool) -> vol.Schema:
         ),
         vol.Required(CONF_ANGLE_CLOSED, default=v[CONF_ANGLE_CLOSED]): _angle(),
         vol.Required(CONF_ANGLE_OPEN, default=v[CONF_ANGLE_OPEN]): _angle(),
+        **_geometry(v),
+    }
+    advanced: dict[Any, Any] = {
         vol.Required(CONF_START_DELAY, default=v[CONF_START_DELAY]): _num(
             0, 10, 0.1, "s"
         ),
@@ -340,52 +414,53 @@ def _panel_schema(values: dict[str, Any], with_name: bool) -> vol.Schema:
         vol.Required(CONF_HOME_END, default=v[CONF_HOME_END]): _choice(
             HOME_ENDS, CONF_HOME_END
         ),
+        **_calibration_field(v),
     }
-    mapping: dict[Any, Any] = {
-        vol.Required(CONF_MAPPING, default=v[CONF_MAPPING]): _choice(
-            [MAPPING_LINEAR, MAPPING_TABLE], CONF_MAPPING
-        ),
-        vol.Required(CONF_POS_AT_MIN, default=v[CONF_POS_AT_MIN]): _num(
-            -10000, 10000, 0.1
-        ),
-        vol.Required(CONF_POS_AT_MAX, default=v[CONF_POS_AT_MAX]): _num(
-            -10000, 10000, 0.1
-        ),
-        _opt(CONF_CALIBRATION, v): selector.TextSelector(
-            selector.TextSelectorConfig(multiline=True)
-        ),
-        _opt(CONF_FEEDBACK, v): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain=["sensor", "number", "input_number"])
-        ),
-        vol.Required(CONF_FEEDBACK_KIND, default=v[CONF_FEEDBACK_KIND]): _choice(
-            [FEEDBACK_POSITION, FEEDBACK_ANGLE], CONF_FEEDBACK_KIND
-        ),
-        vol.Required(CONF_TRAVEL_TIME, default=v[CONF_TRAVEL_TIME]): _num(
-            1, 3600, 1, "s"
-        ),
+    fields[vol.Required(SECTION_RELAY_ADVANCED)] = section(
+        vol.Schema(advanced), {"collapsed": True}
+    )
+    return vol.Schema(fields)
+
+
+def _clamp(value: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, value))
+
+
+def season_suggestion(latitude: float, lo: float, hi: float) -> tuple[float, float]:
+    """Winter and summer angles for a latitude: about lat+15 and lat-35."""
+    lat = abs(latitude)
+    winter = _clamp(round(lat + 15), max(lo, 0), min(hi, 90))
+    summer = _clamp(round(lat - 35), max(lo, 0), min(hi, 90))
+    return winter, summer
+
+
+def _position_values(
+    data: dict[str, Any], latitude: float, fresh: bool
+) -> dict[str, Any]:
+    """Step 3 defaults: saved (or default) angles, clamped to the soft limits."""
+    v = {**PANEL_DEFAULTS, **data}
+    lo, hi = v[CONF_MIN_ANGLE], v[CONF_MAX_ANGLE]
+    if fresh and v[CONF_AXIS] != AXIS_ROLL:
+        v[CONF_WINTER_ANGLE], v[CONF_SUMMER_ANGLE] = season_suggestion(latitude, lo, hi)
+    for key in ANGLE_POSITION_KEYS:
+        v[key] = _clamp(v[key], lo, hi)
+    return v
+
+
+def _positions_schema(v: dict[str, Any]) -> vol.Schema:
+    lo, hi = v[CONF_MIN_ANGLE], v[CONF_MAX_ANGLE]
+    fields: dict[Any, Any] = {
+        vol.Required(key, default=v[key]): _angle(lo, hi) for key in ANGLE_POSITION_KEYS
     }
-    positions: dict[Any, Any] = {
-        vol.Required(key, default=v[key]): (
-            _num(0, 100, 1, "%", box=False) if key == CONF_SEASON_WEIGHT else _angle()
-        )
-        for key in POSITION_KEYS
-    }
+    fields[vol.Required(CONF_SEASON_WEIGHT, default=v[CONF_SEASON_WEIGHT])] = _num(
+        0, 100, 1, "%", box=False
+    )
     pv: dict[Any, Any] = {
         _opt(CONF_PV_POWER, v): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="sensor", device_class="power")
         ),
         vol.Required(CONF_PV_PEAK, default=v[CONF_PV_PEAK]): _num(0, 1000000, 10, "W"),
     }
-    fields[vol.Required(SECTION_RELAYS)] = section(
-        vol.Schema(relays),
-        {"collapsed": v[CONF_ACTUATOR_TYPE] != ACTUATOR_RELAYS},
-    )
-    fields[vol.Required(SECTION_MAPPING)] = section(
-        vol.Schema(mapping), {"collapsed": True}
-    )
-    fields[vol.Required(SECTION_POSITIONS)] = section(
-        vol.Schema(positions), {"collapsed": True}
-    )
     fields[vol.Required(SECTION_PV)] = section(vol.Schema(pv), {"collapsed": True})
     return vol.Schema(fields)
 
@@ -395,24 +470,22 @@ def _flatten(user_input: dict[str, Any]) -> dict[str, Any]:
     for name in SECTIONS:
         data.update(user_input.get(name, {}))
     # Cleared optional fields: drop them so defaults apply.
-    for key in (
-        CONF_FEEDBACK,
-        CONF_PV_POWER,
-        CONF_CALIBRATION,
-        CONF_ACTUATOR,
-        CONF_OPEN_SWITCH,
-        CONF_CLOSE_SWITCH,
-        CONF_OPEN_COUNTDOWN,
-        CONF_CLOSE_COUNTDOWN,
-    ):
-        if not data.get(key):
-            data.pop(key, None)
+    for key in OPTIONAL_KEYS:
+        if key in data and not data[key]:
+            data.pop(key)
+    return data
+
+
+def _clean(data: dict[str, Any]) -> dict[str, Any]:
+    """Keep only the keys of the chosen actuator type."""
+    data = dict(data)
     data.setdefault(CONF_ACTUATOR_TYPE, ACTUATOR_ENTITY)
-    if data[CONF_ACTUATOR_TYPE] == ACTUATOR_RELAYS:
-        data.pop(CONF_ACTUATOR, None)
-    else:
-        for key in RELAY_KEYS:
-            data.pop(key, None)
+    drop = ENTITY_KEYS if data[CONF_ACTUATOR_TYPE] == ACTUATOR_RELAYS else RELAY_KEYS
+    for key in drop:
+        data.pop(key, None)
+    for key in OPTIONAL_KEYS:
+        if key in data and not data[key]:
+            data.pop(key)
     return data
 
 
@@ -428,20 +501,21 @@ def _validate_relays(data: dict[str, Any]) -> dict[str, str]:
     if not open_switch or not close_switch:
         return {"base": "relays_required"}
     if open_switch == close_switch:
-        return {"base": "same_relay"}
+        return {CONF_CLOSE_SWITCH: "same_relay"}
     countdowns = [data.get(CONF_OPEN_COUNTDOWN), data.get(CONF_CLOSE_COUNTDOWN)]
     if countdowns[0] and countdowns[0] == countdowns[1]:
-        return {"base": "same_countdown"}
+        return {CONF_CLOSE_COUNTDOWN: "same_countdown"}
     closed, opened = data[CONF_ANGLE_CLOSED], data[CONF_ANGLE_OPEN]
     if closed == opened:
-        return {"base": "same_end_angles"}
+        return {CONF_ANGLE_OPEN: "same_end_angles"}
     lo, hi = sorted((closed, opened))
     if data[CONF_MIN_ANGLE] < lo - 0.5 or data[CONF_MAX_ANGLE] > hi + 0.5:
         return {"base": "limits_outside_stroke"}
     return {}
 
 
-def _validate_panel(data: dict[str, Any]) -> dict[str, str]:
+def _validate_actuator(data: dict[str, Any]) -> dict[str, str]:
+    """Step 2: the actuator fields and the geometry."""
     if data[CONF_ACTUATOR_TYPE] == ACTUATOR_RELAYS:
         if errors := _validate_relays(data):
             return errors
@@ -452,7 +526,7 @@ def _validate_panel(data: dict[str, Any]) -> dict[str, str]:
         return {CONF_MAX_ANGLE: "max_below_min"}
     if data[CONF_AXIS] != AXIS_ROLL and (lo < 0 or hi > 90):
         return {CONF_MIN_ANGLE: "tilt_range"}
-    if data[CONF_MAPPING] == MAPPING_TABLE and not data.get(CONF_CALIBRATION):
+    if data.get(CONF_MAPPING) == MAPPING_TABLE and not data.get(CONF_CALIBRATION):
         return {"base": "calibration_required"}
     try:
         PanelConfig.from_data(data).build_mapping()
@@ -461,7 +535,136 @@ def _validate_panel(data: dict[str, Any]) -> dict[str, str]:
     return {}
 
 
-class HeliosConfigFlow(ConfigFlow, domain=DOMAIN):
+def _validate_positions(data: dict[str, Any]) -> dict[str, str]:
+    lo, hi = data[CONF_MIN_ANGLE], data[CONF_MAX_ANGLE]
+    for key in ANGLE_POSITION_KEYS:
+        if not lo - 1e-6 <= data[key] <= hi + 1e-6:
+            return {key: "outside_limits"}
+    return {}
+
+
+class PanelSteps:
+    """The panel steps, shared by the first-panel step and the subentry flows."""
+
+    _panel: dict[str, Any]
+    _reconfiguring: bool = False
+    _season_ok: tuple[float, float] | None = None
+
+    # Hooks
+    def _latitude(self) -> float:
+        raise NotImplementedError
+
+    def _actuator_taken(self, unique_id: str) -> bool:
+        return False
+
+    async def _async_finish(self, title: str, data: dict[str, Any]) -> Any:
+        raise NotImplementedError
+
+    def _initial(self) -> dict[str, Any]:
+        return {}
+
+    # Step 1 is the flow's own (panel / user / settings); it calls this.
+    async def _async_type_step(
+        self, step_id: str, user_input: dict[str, Any] | None
+    ) -> Any:
+        if user_input is not None:
+            previous = self._panel.get(CONF_ACTUATOR_TYPE)
+            self._panel = {**self._panel, **user_input}
+            if previous and previous != user_input[CONF_ACTUATOR_TYPE]:
+                # Another type: start its fields from the defaults.
+                for key in (*RELAY_KEYS, *ENTITY_KEYS, CONF_MAPPING, CONF_CALIBRATION):
+                    self._panel.pop(key, None)
+            if user_input[CONF_ACTUATOR_TYPE] == ACTUATOR_RELAYS:
+                return await self.async_step_relays()
+            return await self.async_step_entity()
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id=step_id, data_schema=_type_schema(self._panel)
+        )
+
+    async def _async_actuator_step(
+        self, step_id: str, schema: Any, user_input: dict[str, Any] | None
+    ) -> Any:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            data = {**self._panel, **_flatten(user_input)}
+            for key in OPTIONAL_KEYS:  # cleared on this form
+                if key not in _flatten(user_input) and key in _form_keys(schema):
+                    data.pop(key, None)
+            errors = _validate_actuator(data)
+            if not errors and self._actuator_taken(_unique_id(data)):
+                errors = {"base": "actuator_in_use"}
+            self._panel = data
+            if not errors:
+                return await self.async_step_positions()
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id=step_id,
+            data_schema=schema(self._panel),
+            errors=errors,
+            description_placeholders={"name": self._panel.get(CONF_NAME, "")},
+        )
+
+    async def async_step_entity(self, user_input: dict[str, Any] | None = None) -> Any:
+        """Step 2 for a cover, number or script."""
+        return await self._async_actuator_step(STEP_ENTITY, _entity_schema, user_input)
+
+    async def async_step_relays(self, user_input: dict[str, Any] | None = None) -> Any:
+        """Step 2 for two relays."""
+        return await self._async_actuator_step(STEP_RELAYS, _relays_schema, user_input)
+
+    async def async_step_positions(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Step 3: positions and the seasonal curve, inside the soft limits."""
+        errors: dict[str, str] = {}
+        lo, hi = self._panel[CONF_MIN_ANGLE], self._panel[CONF_MAX_ANGLE]
+        winter, summer = season_suggestion(self._latitude(), lo, hi)
+        if user_input is not None:
+            flat = _flatten(user_input)
+            data = {**self._panel, **flat}
+            if CONF_PV_POWER not in flat:
+                data.pop(CONF_PV_POWER, None)
+            errors = _validate_positions(data)
+            pair = (data[CONF_WINTER_ANGLE], data[CONF_SUMMER_ANGLE])
+            if not errors and pair[0] == pair[1] and self._season_ok != pair:
+                # A hint, once: submit again to keep a flat seasonal curve.
+                self._season_ok = pair
+                errors = {"base": "season_flat"}
+            self._panel = data
+            if not errors:
+                clean = _clean(data)
+                title = clean.pop(CONF_NAME)
+                return await self._async_finish(title, clean)
+            values = data
+        else:
+            values = _position_values(
+                self._panel, self._latitude(), fresh=not self._reconfiguring
+            )
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id=STEP_POSITIONS,
+            data_schema=_positions_schema({**PANEL_DEFAULTS, **values}),
+            errors=errors,
+            description_placeholders={
+                "min": f"{lo:g}",
+                "max": f"{hi:g}",
+                "latitude": f"{self._latitude():.1f}",
+                "winter": f"{winter:g}",
+                "summer": f"{summer:g}",
+            },
+        )
+
+
+def _form_keys(schema: Any) -> set[str]:
+    """Every field (also inside sections) of a step-2 schema."""
+    keys: set[str] = set()
+    for marker, value in schema({}).schema.items():
+        if isinstance(value, section):
+            keys |= {str(k) for k in value.schema.schema}
+        else:
+            keys.add(str(marker))
+    return keys
+
+
+class HeliosConfigFlow(PanelSteps, ConfigFlow, domain=DOMAIN):
     """Site, then the first panel."""
 
     VERSION = 1
@@ -469,6 +672,7 @@ class HeliosConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Start."""
         self._site: dict[str, Any] = {}
+        self._panel = {}
 
     @staticmethod
     @callback
@@ -490,6 +694,9 @@ class HeliosConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_LONGITUDE: self.hass.config.longitude,
         }
 
+    def _latitude(self) -> float:
+        return float(self._site.get(CONF_LATITUDE, self.hass.config.latitude))
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -508,31 +715,23 @@ class HeliosConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_panel(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """The first panel."""
-        errors: dict[str, str] = {}
-        values: dict[str, Any] = {}
-        if user_input is not None:
-            data = _flatten(user_input)
-            values = data
-            errors = _validate_panel(data)
-            if not errors:
-                title = data.pop(CONF_NAME)
-                site = dict(self._site)
-                name = site.pop(CONF_NAME)
-                return self.async_create_entry(
-                    title=name,
-                    data=site,
-                    subentries=[
-                        ConfigSubentryData(
-                            data=data,
-                            subentry_type=SUBENTRY_PANEL,
-                            title=title,
-                            unique_id=_unique_id(data),
-                        )
-                    ],
+        """The first panel: its name and actuator type."""
+        return await self._async_type_step("panel", user_input)
+
+    async def _async_finish(self, title: str, data: dict[str, Any]) -> ConfigFlowResult:
+        site = dict(self._site)
+        name = site.pop(CONF_NAME)
+        return self.async_create_entry(
+            title=name,
+            data=site,
+            subentries=[
+                ConfigSubentryData(
+                    data=data,
+                    subentry_type=SUBENTRY_PANEL,
+                    title=title,
+                    unique_id=_unique_id(data),
                 )
-        return self.async_show_form(
-            step_id="panel", data_schema=_panel_schema(values, True), errors=errors
+            ],
         )
 
     async def async_step_reconfigure(
@@ -572,35 +771,48 @@ class HeliosOptionsFlow(OptionsFlow):
         )
 
 
-class PanelSubentryFlow(ConfigSubentryFlow):
+class PanelSubentryFlow(PanelSteps, ConfigSubentryFlow):
     """Add or change a panel."""
 
-    def _taken(self, actuator: str, exclude: str | None = None) -> bool:
+    def __init__(self) -> None:
+        """Start."""
+        self._panel = {}
+
+    def _latitude(self) -> float:
+        entry = self._get_entry()
+        return float(entry.data.get(CONF_LATITUDE, self.hass.config.latitude))
+
+    def _actuator_taken(self, unique_id: str) -> bool:
+        exclude = (
+            self._get_reconfigure_subentry().subentry_id
+            if self._reconfiguring
+            else None
+        )
         return any(
-            s.unique_id == actuator and s.subentry_id != exclude
+            s.unique_id == unique_id and s.subentry_id != exclude
             for s in self._get_entry().subentries.values()
+        )
+
+    async def _async_finish(
+        self, title: str, data: dict[str, Any]
+    ) -> SubentryFlowResult:
+        if not self._reconfiguring:
+            return self.async_create_entry(
+                title=title, data=data, unique_id=_unique_id(data)
+            )
+        return self.async_update_and_abort(
+            self._get_entry(),
+            self._get_reconfigure_subentry(),
+            title=title,
+            data=data,
+            unique_id=_unique_id(data),
         )
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """New panel."""
-        errors: dict[str, str] = {}
-        values: dict[str, Any] = {}
-        if user_input is not None:
-            data = _flatten(user_input)
-            values = data
-            errors = _validate_panel(data)
-            if not errors and self._taken(_unique_id(data)):
-                errors = {"base": "actuator_in_use"}
-            if not errors:
-                title = data.pop(CONF_NAME)
-                return self.async_create_entry(
-                    title=title, data=data, unique_id=_unique_id(data)
-                )
-        return self.async_show_form(
-            step_id="user", data_schema=_panel_schema(values, True), errors=errors
-        )
+        """New panel: name and actuator type."""
+        return await self._async_type_step("user", user_input)
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
@@ -616,35 +828,17 @@ class PanelSubentryFlow(ConfigSubentryFlow):
     async def async_step_settings(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """Change a panel's settings."""
-        entry = self._get_entry()
-        subentry = self._get_reconfigure_subentry()
-        errors: dict[str, str] = {}
-        values: dict[str, Any] = {CONF_NAME: subentry.title, **subentry.data}
-        if user_input is not None:
-            data = _flatten(user_input)
-            values = data
-            errors = _validate_panel(data)
-            if not errors and self._taken(_unique_id(data), subentry.subentry_id):
-                errors = {"base": "actuator_in_use"}
-            if not errors:
-                title = data.pop(CONF_NAME)
-                return self.async_update_and_abort(
-                    entry,
-                    subentry,
-                    title=title,
-                    data=data,
-                    unique_id=_unique_id(data),
-                )
-        return self.async_show_form(
-            step_id="settings",
-            data_schema=_panel_schema(values, True),
-            errors=errors,
-        )
+        """Change a panel: name and actuator type first."""
+        if not self._reconfiguring:
+            subentry = self._get_reconfigure_subentry()
+            self._reconfiguring = True
+            self._panel = {CONF_NAME: subentry.title, **subentry.data}
+            self._panel.setdefault(CONF_ACTUATOR_TYPE, ACTUATOR_ENTITY)
+        return await self._async_type_step("settings", user_input)
 
     # ---- guided travel-time calibration (two relays) -------------------------------
 
-    def _panel(self) -> tuple[Any, Any] | None:
+    def _loaded_panel(self) -> tuple[Any, Any] | None:
         entry = self._get_entry()
         if entry.state is not ConfigEntryState.LOADED:
             return None
@@ -658,7 +852,7 @@ class PanelSubentryFlow(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         """Explain, then close fully (homing) and start opening."""
-        found = self._panel()
+        found = self._loaded_panel()
         if found is None:
             return self.async_abort(reason="not_loaded")
         site, panel = found
@@ -681,7 +875,7 @@ class PanelSubentryFlow(ConfigSubentryFlow):
         self, phase: str, user_input: dict[str, Any] | None
     ) -> dict[str, str] | None:
         """Submit = the end is reached. None when marked, else form errors."""
-        found = self._panel()
+        found = self._loaded_panel()
         if found is None:
             return {"base": "calibration_failed"}
         _site, panel = found
@@ -738,7 +932,7 @@ class PanelSubentryFlow(ConfigSubentryFlow):
             return self.async_update_and_abort(
                 entry, subentry, data={**subentry.data, **user_input}
             )
-        found = self._panel()
+        found = self._loaded_panel()
         cal = (found[1].driver.calibration if found else None) or {}
         return self.async_show_form(
             step_id="travel_result",
@@ -767,6 +961,6 @@ class PanelSubentryFlow(ConfigSubentryFlow):
         """The dialog was closed mid-calibration: stop the relays."""
         if not getattr(self, "_calibrating", False):
             return
-        found = self._panel()
+        found = self._loaded_panel()
         if found is not None and found[1].driver.calibrating:
             found[0].async_travel_calibration(found[1], "cancel")

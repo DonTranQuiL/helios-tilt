@@ -111,8 +111,11 @@ Copy `custom_components/helios_tilt` into your `config/custom_components/` folde
 ### Setup
 
 1. **Site:** a name, the location (defaults to your Home Assistant location), and a **weather entity** and/or a **wind speed sensor**.
-2. **First panel:** the actuator, axis, azimuth, soft limits, step and strategy. Collapsed sections hold the mapping and feedback, the positions (stow, night, diffuse, snow, rain, frost, and the seasonal winter/summer angles) and the optional PV comparison.
-3. To add more panels: on the integration page, choose **⋮ → Add panel**. Each panel's **⋮ → Reconfigure** changes it later.
+2. **First panel**, in three short steps:
+   1. A name and the **actuator type**: *Entity (cover, number or script)* or *Two relays (timed)*.
+   2. Only that type's settings, plus the axis, azimuth, soft limits (min/max angle), step and strategy. For an entity, that's the entity and its mapping and feedback. For two relays, it's the open/close switch, the countdowns, the travel times and the angles at both ends; homing, timing and an optional stroke table are in a collapsed section.
+   3. The positions (stow, night, diffuse, snow, rain, frost) and the seasonal winter/summer angles, plus the optional PV comparison. Every angle is kept between the soft limits: the defaults are clamped to them and the fields don't accept anything outside. The winter and summer angles are suggested from your latitude (about latitude + 15° and latitude − 35°, within the limits). If you set them equal, a note warns that the seasonal curve is flat; submit again to keep it.
+3. To add more panels: on the integration page, choose **⋮ → Add panel**. Each panel's **⋮ → Reconfigure** changes it later, in the same steps. Switching the actuator type there drops the old type's settings; a relay panel never uses an actuator entity.
 4. Under **Configure** on the site you'll find the thresholds: wind speeds, calm time, storm hold, stale-data time, weather positions, cloud threshold, minimum interval, manual pause, deadband and hysteresis. **Reconfigure** on the site changes the location and weather sources.
 
 ### Actuator mapping
@@ -177,7 +180,7 @@ Zigbee2MQTT exposes the module, here named `attic_window`, as:
 
 1. In Zigbee2MQTT, set `power_on_behavior_l1` and `power_on_behavior_l2` to **off**. As an extra cap, you can enable *inching control* for both channels (auto-off after each switch-on). Set `inching_time_1/2` a few seconds **above** the longest run (full travel time × 1.15 + 5 s). Otherwise inching cuts homing runs short.
 2. Wire L1 to the actuator's extend input and L2 to retract, as the actuator's manual shows. The actuator's internal limit switches must stop it at both ends.
-3. Add a panel: **Actuator type:** Two relays (timed). **Open relay:** `switch.attic_window_l1`. **Close relay:** `switch.attic_window_l2`. **Countdowns:** `number.attic_window_countdown_l1` / `_l2`. Enter the angles at both ends, for example 0° closed and 35° open, and set the soft limits (min/max angle) inside that range.
+3. Add a panel. **Step 1:** a name, and **Actuator type:** Two relays (timed). **Step 2:** **Open relay** `switch.attic_window_l1`, **Close relay** `switch.attic_window_l2`, **Countdowns** `number.attic_window_countdown_l1` / `_l2`, the angles at both ends (for example 10° closed and 40° open), and soft limits (min/max angle) inside that range, e.g. 10° to 40°. **Step 3:** check the positions; they are already within the limits.
 4. Time the travel as above. Then press **Home now** and check that it closes fully.
 5. Test the stow angle and a wind stow (raise a test wind sensor above the stow speed) while you watch.
 
