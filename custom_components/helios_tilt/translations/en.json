@@ -61,10 +61,10 @@
               "home_end": "Home against"
             },
             "data_description": {
-              "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.<name>_l1). The actuator must have its own limit switches.",
-              "close_switch": "Switch that makes it retract (switch.<name>_l2). Never both on: Helios switches the other one off first.",
-              "open_countdown": "Optional, e.g. number.<name>_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
-              "close_countdown": "Optional, e.g. number.<name>_countdown_l2.",
+              "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.NAME_l1). The actuator must have its own limit switches.",
+              "close_switch": "Switch that makes it retract (switch.NAME_l2). Never both on: Helios switches the other one off first.",
+              "open_countdown": "Optional, e.g. number.NAME_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
+              "close_countdown": "Optional, e.g. number.NAME_countdown_l2.",
               "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
               "close_time": "Seconds from fully open to fully closed (often different).",
               "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
@@ -213,10 +213,10 @@
                 "home_end": "Home against"
               },
               "data_description": {
-                "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.<name>_l1). The actuator must have its own limit switches.",
-                "close_switch": "Switch that makes it retract (switch.<name>_l2). Never both on: Helios switches the other one off first.",
-                "open_countdown": "Optional, e.g. number.<name>_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
-                "close_countdown": "Optional, e.g. number.<name>_countdown_l2.",
+                "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.NAME_l1). The actuator must have its own limit switches.",
+                "close_switch": "Switch that makes it retract (switch.NAME_l2). Never both on: Helios switches the other one off first.",
+                "open_countdown": "Optional, e.g. number.NAME_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
+                "close_countdown": "Optional, e.g. number.NAME_countdown_l2.",
                 "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
                 "close_time": "Seconds from fully open to fully closed (often different).",
                 "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
@@ -325,10 +325,10 @@
                 "home_end": "Home against"
               },
               "data_description": {
-                "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.<name>_l1). The actuator must have its own limit switches.",
-                "close_switch": "Switch that makes it retract (switch.<name>_l2). Never both on: Helios switches the other one off first.",
-                "open_countdown": "Optional, e.g. number.<name>_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
-                "close_countdown": "Optional, e.g. number.<name>_countdown_l2.",
+                "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.NAME_l1). The actuator must have its own limit switches.",
+                "close_switch": "Switch that makes it retract (switch.NAME_l2). Never both on: Helios switches the other one off first.",
+                "open_countdown": "Optional, e.g. number.NAME_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
+                "close_countdown": "Optional, e.g. number.NAME_countdown_l2.",
                 "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
                 "close_time": "Seconds from fully open to fully closed (often different).",
                 "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",

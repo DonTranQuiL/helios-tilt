@@ -61,10 +61,10 @@
               "home_end": "Homen tegen"
             },
             "data_description": {
-              "open_switch": "Schakelaar waarmee de actuator uitschuift (Zigbee2MQTT: switch.<naam>_l1). De actuator moet eigen eindschakelaars hebben.",
-              "close_switch": "Schakelaar waarmee hij intrekt (switch.<naam>_l2). Nooit allebei aan: Helios zet eerst de andere uit.",
-              "open_countdown": "Optioneel, bijv. number.<naam>_countdown_l1. Wordt bij elke beweging gezet als hardwarebeveiliging: het relais schakelt zelf uit, ook als Home Assistant stopt.",
-              "close_countdown": "Optioneel, bijv. number.<naam>_countdown_l2.",
+              "open_switch": "Schakelaar waarmee de actuator uitschuift (Zigbee2MQTT: switch.NAAM_l1). De actuator moet eigen eindschakelaars hebben.",
+              "close_switch": "Schakelaar waarmee hij intrekt (switch.NAAM_l2). Nooit allebei aan: Helios zet eerst de andere uit.",
+              "open_countdown": "Optioneel, bijv. number.NAAM_countdown_l1. Wordt bij elke beweging gezet als hardwarebeveiliging: het relais schakelt zelf uit, ook als Home Assistant stopt.",
+              "close_countdown": "Optioneel, bijv. number.NAAM_countdown_l2.",
               "open_time": "Seconden van volledig dicht naar volledig open. Meet het via Opnieuw configureren > Looptijd meten.",
               "close_time": "Seconden van volledig open naar volledig dicht (vaak anders).",
               "angle_closed": "Meet de hoek van het paneel (of raam) aan beide uiteinden; de slag wordt daartussen lineair omgerekend, of gebruik een kalibratietabel met hoek:slag%-paren.",
@@ -213,10 +213,10 @@
                 "home_end": "Homen tegen"
               },
               "data_description": {
-                "open_switch": "Schakelaar waarmee de actuator uitschuift (Zigbee2MQTT: switch.<naam>_l1). De actuator moet eigen eindschakelaars hebben.",
-                "close_switch": "Schakelaar waarmee hij intrekt (switch.<naam>_l2). Nooit allebei aan: Helios zet eerst de andere uit.",
-                "open_countdown": "Optioneel, bijv. number.<naam>_countdown_l1. Wordt bij elke beweging gezet als hardwarebeveiliging: het relais schakelt zelf uit, ook als Home Assistant stopt.",
-                "close_countdown": "Optioneel, bijv. number.<naam>_countdown_l2.",
+                "open_switch": "Schakelaar waarmee de actuator uitschuift (Zigbee2MQTT: switch.NAAM_l1). De actuator moet eigen eindschakelaars hebben.",
+                "close_switch": "Schakelaar waarmee hij intrekt (switch.NAAM_l2). Nooit allebei aan: Helios zet eerst de andere uit.",
+                "open_countdown": "Optioneel, bijv. number.NAAM_countdown_l1. Wordt bij elke beweging gezet als hardwarebeveiliging: het relais schakelt zelf uit, ook als Home Assistant stopt.",
+                "close_countdown": "Optioneel, bijv. number.NAAM_countdown_l2.",
                 "open_time": "Seconden van volledig dicht naar volledig open. Meet het via Opnieuw configureren > Looptijd meten.",
                 "close_time": "Seconden van volledig open naar volledig dicht (vaak anders).",
                 "angle_closed": "Meet de hoek van het paneel (of raam) aan beide uiteinden; de slag wordt daartussen lineair omgerekend, of gebruik een kalibratietabel met hoek:slag%-paren.",
@@ -325,10 +325,10 @@
                 "home_end": "Homen tegen"
               },
               "data_description": {
-                "open_switch": "Schakelaar waarmee de actuator uitschuift (Zigbee2MQTT: switch.<naam>_l1). De actuator moet eigen eindschakelaars hebben.",
-                "close_switch": "Schakelaar waarmee hij intrekt (switch.<naam>_l2). Nooit allebei aan: Helios zet eerst de andere uit.",
-                "open_countdown": "Optioneel, bijv. number.<naam>_countdown_l1. Wordt bij elke beweging gezet als hardwarebeveiliging: het relais schakelt zelf uit, ook als Home Assistant stopt.",
-                "close_countdown": "Optioneel, bijv. number.<naam>_countdown_l2.",
+                "open_switch": "Schakelaar waarmee de actuator uitschuift (Zigbee2MQTT: switch.NAAM_l1). De actuator moet eigen eindschakelaars hebben.",
+                "close_switch": "Schakelaar waarmee hij intrekt (switch.NAAM_l2). Nooit allebei aan: Helios zet eerst de andere uit.",
+                "open_countdown": "Optioneel, bijv. number.NAAM_countdown_l1. Wordt bij elke beweging gezet als hardwarebeveiliging: het relais schakelt zelf uit, ook als Home Assistant stopt.",
+                "close_countdown": "Optioneel, bijv. number.NAAM_countdown_l2.",
                 "open_time": "Seconden van volledig dicht naar volledig open. Meet het via Opnieuw configureren > Looptijd meten.",
                 "close_time": "Seconden van volledig open naar volledig dicht (vaak anders).",
                 "angle_closed": "Meet de hoek van het paneel (of raam) aan beide uiteinden; de slag wordt daartussen lineair omgerekend, of gebruik een kalibratietabel met hoek:slag%-paren.",
