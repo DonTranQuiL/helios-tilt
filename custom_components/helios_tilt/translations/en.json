@@ -1,0 +1,496 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Helios Tilt site",
+        "description": "Where the panels are and where the wind comes from. Panels are added in the next step.",
+        "data": {
+          "name": "Name",
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "weather_entity": "Weather entity",
+          "wind_sensor": "Wind speed sensor"
+        },
+        "data_description": {
+          "latitude": "Defaults to your Home Assistant location.",
+          "longitude": "Defaults to your Home Assistant location.",
+          "weather_entity": "Wind speed, gusts, condition (snow/rain), temperature and cloud cover.",
+          "wind_sensor": "Optional local anemometer. The highest of all wind readings is used."
+        }
+      },
+      "panel": {
+        "title": "First panel",
+        "data": {
+          "name": "Panel name",
+          "actuator_entity": "Actuator",
+          "axis": "Axis",
+          "azimuth": "Azimuth",
+          "min_angle": "Minimum angle",
+          "max_angle": "Maximum angle",
+          "step": "Step",
+          "strategy": "Strategy"
+        },
+        "data_description": {
+          "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables).",
+          "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
+          "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
+          "min_angle": "Soft limit, never commanded below this.",
+          "max_angle": "Soft limit, never commanded above this.",
+          "step": "Targets are rounded to this step (0 = no rounding).",
+          "strategy": "How the angle is chosen in automatic mode."
+        },
+        "sections": {
+          "mapping_feedback": {
+            "name": "Actuator mapping and feedback",
+            "data": {
+              "mapping": "Mapping",
+              "position_at_min": "Position at minimum angle",
+              "position_at_max": "Position at maximum angle",
+              "calibration": "Calibration table",
+              "feedback_entity": "Feedback sensor",
+              "feedback_kind": "Feedback reports",
+              "travel_time": "Full stroke travel time"
+            },
+            "data_description": {
+              "position_at_min": "Swap the two positions to invert the actuator.",
+              "calibration": "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100",
+              "feedback_entity": "Optional. Without it the cover position is used, or an estimate from the travel time.",
+              "travel_time": "Seconds from minimum to maximum. Used for estimates and the stuck check."
+            }
+          },
+          "positions": {
+            "name": "Positions and seasonal curve",
+            "data": {
+              "stow_angle": "Stow angle (wind/storm)",
+              "night_angle": "Night park angle",
+              "diffuse_angle": "Cloudy (diffuse) angle",
+              "snow_angle": "Snow shedding angle",
+              "rain_angle": "Heavy rain angle",
+              "frost_angle": "Frost angle",
+              "winter_angle": "Winter angle",
+              "summer_angle": "Summer angle",
+              "season_weight": "Season weight"
+            },
+            "data_description": {
+              "stow_angle": "Lowest wind load for your mount, usually flat.",
+              "season_weight": "Seasonal strategy: 50 is a plain cosine, higher stays at the winter angle longer."
+            }
+          },
+          "pv": {
+            "name": "PV comparison (optional)",
+            "data": {
+              "pv_power_entity": "PV power sensor",
+              "pv_peak_power": "PV peak power"
+            },
+            "data_description": {
+              "pv_peak_power": "Peak power of the panels on this mount, for the actual-vs-model sensor."
+            }
+          }
+        },
+        "description": "One mount driven by one actuator. Add more panels later from the integration page."
+      },
+      "reconfigure": {
+        "title": "Location and weather",
+        "data": {
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "weather_entity": "Weather entity",
+          "wind_sensor": "Wind speed sensor"
+        },
+        "data_description": {
+          "latitude": "Defaults to your Home Assistant location.",
+          "longitude": "Defaults to your Home Assistant location.",
+          "weather_entity": "Wind speed, gusts, condition (snow/rain), temperature and cloud cover.",
+          "wind_sensor": "Optional local anemometer. The highest of all wind readings is used."
+        }
+      }
+    },
+    "error": {
+      "wind_source_required": "Choose a weather entity or a wind speed sensor: wind protection needs one.",
+      "max_below_min": "The maximum angle must be above the minimum angle.",
+      "tilt_range": "A tilt axis works between 0 and 90 degrees. Use the roll axis for negative angles.",
+      "calibration_required": "Enter a calibration table or choose linear mapping.",
+      "invalid_mapping": "The mapping can't be used. Table: at least two angle:position pairs, positions rising (or falling) with the angle. Linear: the two positions must differ.",
+      "actuator_in_use": "This actuator already drives another panel.",
+      "resume_above_stow": "The resume speed must be below the stow speed.",
+      "storm_below_stow": "The storm speed must be at least the stow speed."
+    },
+    "abort": {
+      "already_configured": "This site is already set up.",
+      "reconfigure_successful": "Saved."
+    }
+  },
+  "config_subentries": {
+    "panel": {
+      "initiate_flow": {
+        "user": "Add panel"
+      },
+      "entry_type": "Panel",
+      "step": {
+        "user": {
+          "title": "Add a panel",
+          "data": {
+            "name": "Panel name",
+            "actuator_entity": "Actuator",
+            "axis": "Axis",
+            "azimuth": "Azimuth",
+            "min_angle": "Minimum angle",
+            "max_angle": "Maximum angle",
+            "step": "Step",
+            "strategy": "Strategy"
+          },
+          "data_description": {
+            "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables).",
+            "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
+            "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
+            "min_angle": "Soft limit, never commanded below this.",
+            "max_angle": "Soft limit, never commanded above this.",
+            "step": "Targets are rounded to this step (0 = no rounding).",
+            "strategy": "How the angle is chosen in automatic mode."
+          },
+          "sections": {
+            "mapping_feedback": {
+              "name": "Actuator mapping and feedback",
+              "data": {
+                "mapping": "Mapping",
+                "position_at_min": "Position at minimum angle",
+                "position_at_max": "Position at maximum angle",
+                "calibration": "Calibration table",
+                "feedback_entity": "Feedback sensor",
+                "feedback_kind": "Feedback reports",
+                "travel_time": "Full stroke travel time"
+              },
+              "data_description": {
+                "position_at_min": "Swap the two positions to invert the actuator.",
+                "calibration": "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100",
+                "feedback_entity": "Optional. Without it the cover position is used, or an estimate from the travel time.",
+                "travel_time": "Seconds from minimum to maximum. Used for estimates and the stuck check."
+              }
+            },
+            "positions": {
+              "name": "Positions and seasonal curve",
+              "data": {
+                "stow_angle": "Stow angle (wind/storm)",
+                "night_angle": "Night park angle",
+                "diffuse_angle": "Cloudy (diffuse) angle",
+                "snow_angle": "Snow shedding angle",
+                "rain_angle": "Heavy rain angle",
+                "frost_angle": "Frost angle",
+                "winter_angle": "Winter angle",
+                "summer_angle": "Summer angle",
+                "season_weight": "Season weight"
+              },
+              "data_description": {
+                "stow_angle": "Lowest wind load for your mount, usually flat.",
+                "season_weight": "Seasonal strategy: 50 is a plain cosine, higher stays at the winter angle longer."
+              }
+            },
+            "pv": {
+              "name": "PV comparison (optional)",
+              "data": {
+                "pv_power_entity": "PV power sensor",
+                "pv_peak_power": "PV peak power"
+              },
+              "data_description": {
+                "pv_peak_power": "Peak power of the panels on this mount, for the actual-vs-model sensor."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Change panel",
+          "data": {
+            "name": "Panel name",
+            "actuator_entity": "Actuator",
+            "axis": "Axis",
+            "azimuth": "Azimuth",
+            "min_angle": "Minimum angle",
+            "max_angle": "Maximum angle",
+            "step": "Step",
+            "strategy": "Strategy"
+          },
+          "data_description": {
+            "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables).",
+            "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
+            "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
+            "min_angle": "Soft limit, never commanded below this.",
+            "max_angle": "Soft limit, never commanded above this.",
+            "step": "Targets are rounded to this step (0 = no rounding).",
+            "strategy": "How the angle is chosen in automatic mode."
+          },
+          "sections": {
+            "mapping_feedback": {
+              "name": "Actuator mapping and feedback",
+              "data": {
+                "mapping": "Mapping",
+                "position_at_min": "Position at minimum angle",
+                "position_at_max": "Position at maximum angle",
+                "calibration": "Calibration table",
+                "feedback_entity": "Feedback sensor",
+                "feedback_kind": "Feedback reports",
+                "travel_time": "Full stroke travel time"
+              },
+              "data_description": {
+                "position_at_min": "Swap the two positions to invert the actuator.",
+                "calibration": "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100",
+                "feedback_entity": "Optional. Without it the cover position is used, or an estimate from the travel time.",
+                "travel_time": "Seconds from minimum to maximum. Used for estimates and the stuck check."
+              }
+            },
+            "positions": {
+              "name": "Positions and seasonal curve",
+              "data": {
+                "stow_angle": "Stow angle (wind/storm)",
+                "night_angle": "Night park angle",
+                "diffuse_angle": "Cloudy (diffuse) angle",
+                "snow_angle": "Snow shedding angle",
+                "rain_angle": "Heavy rain angle",
+                "frost_angle": "Frost angle",
+                "winter_angle": "Winter angle",
+                "summer_angle": "Summer angle",
+                "season_weight": "Season weight"
+              },
+              "data_description": {
+                "stow_angle": "Lowest wind load for your mount, usually flat.",
+                "season_weight": "Seasonal strategy: 50 is a plain cosine, higher stays at the winter angle longer."
+              }
+            },
+            "pv": {
+              "name": "PV comparison (optional)",
+              "data": {
+                "pv_power_entity": "PV power sensor",
+                "pv_peak_power": "PV peak power"
+              },
+              "data_description": {
+                "pv_peak_power": "Peak power of the panels on this mount, for the actual-vs-model sensor."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "wind_source_required": "Choose a weather entity or a wind speed sensor: wind protection needs one.",
+        "max_below_min": "The maximum angle must be above the minimum angle.",
+        "tilt_range": "A tilt axis works between 0 and 90 degrees. Use the roll axis for negative angles.",
+        "calibration_required": "Enter a calibration table or choose linear mapping.",
+        "invalid_mapping": "The mapping can't be used. Table: at least two angle:position pairs, positions rising (or falling) with the angle. Linear: the two positions must differ.",
+        "actuator_in_use": "This actuator already drives another panel.",
+        "resume_above_stow": "The resume speed must be below the stow speed.",
+        "storm_below_stow": "The storm speed must be at least the stow speed."
+      },
+      "abort": {
+        "reconfigure_successful": "Saved."
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Safety and timing",
+        "description": "Wind speeds are in km/h whatever unit your sensors report. Priority is always safety, then manual, then automatic.",
+        "data": {
+          "wind_stow_speed": "Stow at wind speed",
+          "wind_resume_speed": "Resume below wind speed",
+          "calm_minutes": "Calm time before resuming",
+          "storm_speed": "Storm mode at wind speed",
+          "storm_hold_hours": "Storm mode hold time",
+          "stale_minutes": "Wind data is stale after",
+          "snow_mode": "Snow shedding position",
+          "rain_mode": "Heavy rain position",
+          "frost_mode": "Frost position",
+          "frost_temperature": "Frost below temperature",
+          "cloud_threshold": "Diffuse mode above cloud cover",
+          "min_move_interval": "Minimum time between moves",
+          "manual_pause": "Pause after a manual move",
+          "deadband": "Deadband",
+          "hysteresis": "Hysteresis"
+        },
+        "data_description": {
+          "storm_hold_hours": "Storm mode stays on this long after the last strong wind. 0 = until you resume by hand.",
+          "stale_minutes": "Without fresh wind data panels freeze (or stay stowed if it was windy).",
+          "cloud_threshold": "Tracking strategy only: above this cloud cover the panel goes to the diffuse angle.",
+          "min_move_interval": "Safety moves ignore this.",
+          "deadband": "Smaller angle changes are skipped.",
+          "hysteresis": "Extra margin before a rounded target changes step."
+        }
+      }
+    },
+    "error": {
+      "wind_source_required": "Choose a weather entity or a wind speed sensor: wind protection needs one.",
+      "max_below_min": "The maximum angle must be above the minimum angle.",
+      "tilt_range": "A tilt axis works between 0 and 90 degrees. Use the roll axis for negative angles.",
+      "calibration_required": "Enter a calibration table or choose linear mapping.",
+      "invalid_mapping": "The mapping can't be used. Table: at least two angle:position pairs, positions rising (or falling) with the angle. Linear: the two positions must differ.",
+      "actuator_in_use": "This actuator already drives another panel.",
+      "resume_above_stow": "The resume speed must be below the stow speed.",
+      "storm_below_stow": "The storm speed must be at least the stow speed."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "target_angle": {
+        "name": "Target angle"
+      },
+      "current_angle": {
+        "name": "Current angle"
+      },
+      "moves_today": {
+        "name": "Moves today"
+      },
+      "gain": {
+        "name": "Estimated gain"
+      },
+      "pv_performance": {
+        "name": "PV actual vs model"
+      },
+      "last_move": {
+        "name": "Last move",
+        "state": {
+          "strategy": "Strategy",
+          "night": "Night park",
+          "diffuse": "Cloudy",
+          "manual": "Manual",
+          "wind": "Wind stow",
+          "storm": "Storm mode",
+          "stow": "Stowed",
+          "snow": "Snow",
+          "rain": "Heavy rain",
+          "frost": "Frost",
+          "calibrate": "Calibration"
+        }
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "auto": "Automatic",
+          "manual": "Manual",
+          "fixed": "Fixed (annual optimum)",
+          "seasonal": "Seasonal curve",
+          "daily": "Daily optimum",
+          "tracking": "Sun tracking"
+        }
+      }
+    },
+    "number": {
+      "manual_angle": {
+        "name": "Manual angle"
+      }
+    },
+    "switch": {
+      "auto": {
+        "name": "Automatic control"
+      }
+    },
+    "binary_sensor": {
+      "storm": {
+        "name": "Storm mode"
+      },
+      "wind_stow": {
+        "name": "Wind stow"
+      }
+    }
+  },
+  "selector": {
+    "axis": {
+      "options": {
+        "tilt": "Tilt (faces the azimuth)",
+        "roll": "Roll (single-axis tracker)"
+      }
+    },
+    "strategy": {
+      "options": {
+        "fixed": "Fixed (annual optimum)",
+        "seasonal": "Seasonal curve",
+        "daily": "Daily optimum",
+        "tracking": "Sun tracking"
+      }
+    },
+    "mapping": {
+      "options": {
+        "linear": "Linear",
+        "table": "Calibration table"
+      }
+    },
+    "feedback_kind": {
+      "options": {
+        "position": "Actuator position",
+        "angle": "Panel angle (degrees)"
+      }
+    },
+    "mode": {
+      "options": {
+        "auto": "Automatic",
+        "manual": "Manual",
+        "fixed": "Fixed (annual optimum)",
+        "seasonal": "Seasonal curve",
+        "daily": "Daily optimum",
+        "tracking": "Sun tracking"
+      }
+    }
+  },
+  "services": {
+    "set_tilt": {
+      "name": "Set tilt",
+      "description": "Move panels to an angle and switch them to manual mode.",
+      "fields": {
+        "angle": {
+          "name": "Angle",
+          "description": "Panel angle in degrees (clamped to the soft limits)."
+        }
+      }
+    },
+    "stow": {
+      "name": "Stow",
+      "description": "Move panels to their stow angle and keep them there until resumed.",
+      "fields": {
+        "storm": {
+          "name": "Storm mode",
+          "description": "Also latch storm mode for the whole site."
+        }
+      }
+    },
+    "resume_auto": {
+      "name": "Resume automatic",
+      "description": "Clear stow, manual mode, the manual pause and storm mode."
+    },
+    "set_mode": {
+      "name": "Set mode",
+      "description": "Automatic, manual, or force a strategy.",
+      "fields": {
+        "mode": {
+          "name": "Mode",
+          "description": "The new mode."
+        }
+      }
+    },
+    "calibrate": {
+      "name": "Calibrate",
+      "description": "Tell Helios the panel's real angle (for actuators without feedback).",
+      "fields": {
+        "angle": {
+          "name": "Angle",
+          "description": "The measured panel angle."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Helios Tilt is not loaded."
+    },
+    "target_required": {
+      "message": "Choose the panel to calibrate."
+    },
+    "not_a_panel": {
+      "message": "{target} is not a Helios Tilt panel."
+    }
+  },
+  "issues": {
+    "actuator_stuck": {
+      "title": "{panel}: actuator did not reach its angle",
+      "description": "{entity} was told to go to {target}° but reports {current}°. Check the actuator, its power and its end stops. The warning clears by itself once the panel reaches its target."
+    }
+  }
+}

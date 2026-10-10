@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Helios Tilt | Home Assistant</title>
+    <meta name="description" content="Helios Tilt: automatic solar panel tilt control on linear actuators for Home Assistant. Real sun position, four strategies, wind and storm stow, and a dashboard card.">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="theme-color" content="#0B1120">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Helios Tilt: solar panels that follow the sun">
+    <meta property="og:description" content="Automatic tilt control for solar panels on linear actuators. Tracking, seasonal and daily strategies, wind and storm stow, covers, numbers or scripts.">
+    <meta property="og:url" content="https://dontranquil.github.io/helios-tilt/">
+    <meta property="og:image" content="https://dontranquil.github.io/helios-tilt/images/banner.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://dontranquil.github.io/helios-tilt/images/banner.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-[#0B1120] text-slate-200 font-sans selection:bg-amber-500/30 overflow-x-hidden">
+
+    <nav class="fixed top-0 left-0 right-0 z-50 bg-[#0B1120]/80 backdrop-blur-md border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="https://dontranquil.github.io/" class="flex items-center gap-2 text-white font-bold text-xl tracking-wide">
+                <img src="icon.png" alt="" class="w-7 h-7 rounded-lg">
+                Helios Tilt <span class="text-amber-400 font-light">for HA</span>
+            </a>
+            <div class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
+                <a href="#features" class="hover:text-white transition-colors">Features</a>
+                <a href="#angle" class="hover:text-white transition-colors">How it decides</a>
+                <a href="#safety" class="hover:text-white transition-colors">Safety</a>
+                <a href="#installation" class="hover:text-white transition-colors">Install</a>
+                <a href="https://discord.gg/qaHPTTKHae" target="_blank" class="hover:text-white transition-colors">Discord</a>
+                <a href="https://github.com/DonTranQuiL/helios-tilt" target="_blank" class="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-full transition-all">
+                    <i data-lucide="github" class="w-4 h-4"></i> GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="relative pt-32 pb-20 lg:pt-44 lg:pb-24 overflow-hidden">
+        <div class="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-amber-500/10 blur-3xl pointer-events-none"></div>
+        <div class="max-w-7xl mx-auto px-6 relative z-10 text-center">
+            <img src="icon.png" alt="Helios Tilt" class="w-28 h-28 mx-auto mb-8 rounded-3xl drop-shadow-2xl">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-900/30 border border-amber-500/30 text-amber-300 text-sm font-medium mb-6">
+                Solar tilt control for Home Assistant &middot; beta
+            </div>
+            <h1 class="text-5xl md:text-7xl font-extrabold text-white tracking-tight mb-6">Follow the sun.<br>Stow before the storm.</h1>
+            <p class="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">Helios Tilt works out where the sun is, picks the best angle for each panel and drives your linear actuator there. When the wind picks up, it stows the panels first.</p>
+            <div class="flex flex-wrap items-center justify-center gap-4">
+                <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=DonTranQuiL&amp;repository=helios-tilt&amp;category=integration" class="px-6 py-3 rounded-full bg-amber-600 hover:bg-amber-500 text-white font-semibold inline-flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Open in HACS</a>
+                <a href="https://github.com/DonTranQuiL/helios-tilt#try-it-without-hardware" class="px-6 py-3 rounded-full border border-cyan-500/50 text-cyan-200 hover:border-cyan-300">Try it without hardware</a>
+                <a href="https://github.com/DonTranQuiL/helios-tilt/releases" class="px-6 py-3 rounded-full border border-slate-600 text-slate-200 hover:border-slate-400">Releases</a>
+            </div>
+            <div class="mt-12 flex flex-wrap justify-center gap-3 text-sm">
+                <span class="px-4 py-1.5 rounded-full border border-amber-400/60 bg-amber-400/10 text-amber-300 font-semibold">Tracking + seasonal</span>
+                <span class="px-4 py-1.5 rounded-full border border-amber-400/60 bg-amber-400/10 text-amber-300 font-semibold">Daily optimum</span>
+                <span class="px-4 py-1.5 rounded-full border border-cyan-400/60 bg-cyan-400/10 text-cyan-300 font-semibold">Wind + storm stow</span>
+                <span class="px-4 py-1.5 rounded-full border border-cyan-400/60 bg-cyan-400/10 text-cyan-300 font-semibold">Cover / number / script</span>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="py-20 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-14">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">What you get</h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">One device per panel, set up from the UI. Everything runs locally: no cloud service and no extra Python packages.</p>
+            </div>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6">
+                    <i data-lucide="sun" class="text-amber-400 w-7 h-7 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-white mb-2">Real sun position</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">The NOAA algorithm with refraction, checked against reference values, and a clear-sky model to weigh the angles.</p>
+                </div>
+                <div class="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6">
+                    <i data-lucide="sun-medium" class="text-amber-400 w-7 h-7 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-white mb-2">Four strategies</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Fixed annual optimum, a seasonal curve, one move a day to the day's optimum, or full tracking with a cloudy-day mode and night park.</p>
+                </div>
+                <div class="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6">
+                    <i data-lucide="wind" class="text-amber-400 w-7 h-7 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-white mb-2">Wind first</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Stows on wind or gusts from your weather entity and anemometer, in any unit. Resumes after a calm period; storm mode latches for hours.</p>
+                </div>
+                <div class="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6">
+                    <i data-lucide="cable" class="text-amber-400 w-7 h-7 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-white mb-2">Any actuator</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">A cover, a number or a script. Linear or calibration-table mapping, inverted actuators, position or inclinometer feedback, or a travel-time estimate.</p>
+                </div>
+                <div class="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6">
+                    <i data-lucide="shield-check" class="text-amber-400 w-7 h-7 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-white mb-2">Gentle on hardware</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Never commands a moving actuator. Minimum interval, deadband, hysteresis, a pause after manual moves, and a repair notice when an actuator gets stuck.</p>
+                </div>
+                <div class="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6">
+                    <i data-lucide="layout-dashboard" class="text-amber-400 w-7 h-7 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-white mb-2">Dashboard card</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">A side view with the sun, a wind gauge, Auto/Stow/Manual buttons, an angle slider, today's plan and the last moves. Loaded automatically.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="angle" class="py-20 bg-slate-900/40 border-y border-slate-800">
+        <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-start">
+            <div>
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">How the angle is chosen</h2>
+                <p class="text-slate-400 mb-6">Every minute, and whenever the weather or an actuator changes, the first rule that applies wins.</p>
+                <div class="rounded-2xl border border-slate-700 bg-[#0d1326] p-6">
+                    <ol class="space-y-3 text-sm list-decimal list-inside text-slate-300">
+                        <li><span class="text-white font-semibold">Storm or wind stow</span>: stow angle, immediately</li>
+                        <li><span class="text-white font-semibold">Stowed by hand</span>: stow angle</li>
+                        <li><span class="text-white font-semibold">No valid wind data</span>: hold (stay stowed if it was windy)</li>
+                        <li><span class="text-white font-semibold">Snow / heavy rain / frost</span>: their own angles (optional)</li>
+                        <li><span class="text-white font-semibold">Manual mode</span>: your angle</li>
+                        <li><span class="text-white font-semibold">Paused</span> after a move by hand, or automatic control off: hold</li>
+                        <li><span class="text-white font-semibold">Strategy</span>: rounded to the step, with hysteresis, a deadband and a minimum interval</li>
+                    </ol>
+                </div>
+            </div>
+            <div class="rounded-2xl border border-cyan-500/30 bg-cyan-900/10 p-6">
+                <img src="images/card.png" alt="The Helios Tilt card with demo data" class="rounded-xl border border-slate-700 w-full" loading="lazy">
+                <p class="text-xs text-slate-500 mt-3">The bundled card, rendered from demo data.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="safety" class="py-20">
+        <div class="max-w-5xl mx-auto px-6">
+            <div class="rounded-2xl border border-amber-500/30 bg-amber-900/10 p-8">
+                <h2 class="text-2xl md:text-3xl font-bold text-white mb-3 flex items-center gap-2"><i data-lucide="triangle-alert" class="text-amber-400"></i> Mechanical safety</h2>
+                <p class="text-sm text-slate-300 mb-5">Helios Tilt is software. It can't see your mount, and Home Assistant can go offline at the wrong moment.</p>
+                <ul class="space-y-3 text-sm text-slate-300 list-disc list-inside">
+                    <li>Use actuators with hardware end stops or limit switches, and fuse their supply.</li>
+                    <li>Set the soft limits inside the mechanical range and test the stow angle for your mount and local wind loads.</li>
+                    <li>For storm protection that never depends on Home Assistant, add a local fallback in the actuator controller.</li>
+                    <li>Keep people and pets clear of moving mounts. MIT licence, no warranty.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section id="installation" class="py-24 bg-slate-900/40 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-14">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Installation</h2>
+                <p class="text-slate-400">HACS, a restart, and a weather entity or wind sensor.</p>
+            </div>
+            <div class="grid lg:grid-cols-2 gap-8">
+                <div class="rounded-2xl border border-slate-700/50 bg-slate-800/30 p-8">
+                    <h3 class="text-2xl font-bold text-white mb-6">HACS</h3>
+                    <ol class="space-y-4 text-sm text-slate-300">
+                        <li>1. Click <a class="text-amber-300 hover:underline" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=DonTranQuiL&amp;repository=helios-tilt&amp;category=integration">Open in HACS</a>, enable beta versions and download Helios Tilt.</li>
+                        <li>2. Restart Home Assistant.</li>
+                        <li>3. Settings &rarr; Devices &amp; services &rarr; Add integration &rarr; Helios Tilt.</li>
+                        <li>4. Pick your weather entity, then the first panel's actuator, azimuth, limits and strategy. To add more panels, use &#8942; &rarr; Add panel.</li>
+                    </ol>
+                </div>
+                <div class="rounded-2xl border border-cyan-500/30 bg-cyan-900/10 p-8">
+                    <h3 class="text-xl font-bold text-white mb-3">Dashboard card</h3>
+                    <pre class="rounded-xl bg-[#0B1120] border border-slate-700 p-4 text-xs text-slate-300 overflow-x-auto mb-4"><code>type: custom:helios-tilt-card
+title: Solar tilt
+entities:
+  - sensor.garden_target_angle</code></pre>
+                    <p class="text-sm text-slate-400">Wiring examples (ESPHome, MQTT, scripts), a dummy cover for testing, entities, actions and troubleshooting are in the <a class="text-amber-300 hover:underline" href="https://github.com/DonTranQuiL/helios-tilt#readme">README</a>.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-[#050810] border-t border-slate-800 py-12 text-sm text-slate-500">
+        <div class="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-8">
+            <div>
+                <div class="flex items-center gap-2 text-slate-300 font-bold text-lg mb-3">
+                    <img src="icon.png" alt="" class="w-6 h-6 rounded-md"> Helios Tilt
+                </div>
+                <p class="max-w-md">Maintained by DonTranQuiL. A Home Assistant custom integration for solar panel tilt control.</p>
+            </div>
+            <div class="md:text-right space-y-2">
+                <p><a class="hover:text-white" href="https://github.com/DonTranQuiL/helios-tilt">Repository</a></p>
+                <p><a class="hover:text-white" href="https://github.com/DonTranQuiL/helios-tilt/issues">Issues</a></p>
+                <p><a class="hover:text-white" href="https://discord.gg/qaHPTTKHae">Discord</a></p>
+                <p><a class="hover:text-white" href="https://ko-fi.com/DonTranQuiL">Ko-fi</a></p>
+                <p><a class="hover:text-white" href="https://dontranquil.github.io/">All integrations</a></p>
+                <p class="pt-2">MIT</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => { if (window.lucide) lucide.createIcons(); });
+    </script>
+</body>
+</html>

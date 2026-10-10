@@ -1,0 +1,68 @@
+set_tilt:
+  target:
+    entity:
+      integration: helios_tilt
+    device:
+      integration: helios_tilt
+  fields:
+    angle:
+      required: true
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: 1
+          unit_of_measurement: "°"
+          mode: slider
+stow:
+  target:
+    entity:
+      integration: helios_tilt
+    device:
+      integration: helios_tilt
+  fields:
+    storm:
+      default: false
+      selector:
+        boolean:
+resume_auto:
+  target:
+    entity:
+      integration: helios_tilt
+    device:
+      integration: helios_tilt
+set_mode:
+  target:
+    entity:
+      integration: helios_tilt
+    device:
+      integration: helios_tilt
+  fields:
+    mode:
+      required: true
+      selector:
+        select:
+          translation_key: mode
+          options:
+            - auto
+            - manual
+            - fixed
+            - seasonal
+            - daily
+            - tracking
+calibrate:
+  target:
+    entity:
+      integration: helios_tilt
+    device:
+      integration: helios_tilt
+  fields:
+    angle:
+      required: true
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: 0.5
+          unit_of_measurement: "°"
+          mode: box

@@ -1,0 +1,14 @@
+{
+  "domain": "helios_tilt",
+  "name": "Helios Tilt",
+  "after_dependencies": ["frontend"],
+  "codeowners": ["@DonTranQuiL"],
+  "config_flow": true,
+  "dependencies": ["http"],
+  "documentation": "https://github.com/DonTranQuiL/helios-tilt",
+  "integration_type": "hub",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/DonTranQuiL/helios-tilt/issues",
+  "requirements": [],
+  "version": "0.1.0b1"
+}

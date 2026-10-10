@@ -1,0 +1,250 @@
+"""Config flow, panel subentries, options and reconfigure."""
+
+from __future__ import annotations
+
+from homeassistant import config_entries
+from homeassistant.const import CONF_NAME
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
+
+from custom_components.helios_tilt.const import DOMAIN, SUBENTRY_PANEL
+
+from .conftest import LAT, LON
+
+MAPPING = {
+    "mapping": "linear",
+    "position_at_min": 0,
+    "position_at_max": 100,
+    "feedback_kind": "position",
+    "travel_time": 60,
+}
+POSITIONS = {
+    "stow_angle": 0,
+    "night_angle": 15,
+    "diffuse_angle": 10,
+    "snow_angle": 60,
+    "rain_angle": 30,
+    "frost_angle": 30,
+    "winter_angle": 60,
+    "summer_angle": 20,
+    "season_weight": 50,
+}
+
+
+def panel_input(**overrides) -> dict:
+    data = {
+        CONF_NAME: "Garden",
+        "actuator_entity": "cover.panel",
+        "axis": "tilt",
+        "azimuth": 180,
+        "min_angle": 0,
+        "max_angle": 60,
+        "step": 5,
+        "strategy": "daily",
+        "mapping_feedback": {**MAPPING},
+        "positions": {**POSITIONS},
+        "pv": {"pv_peak_power": 0},
+    }
+    for key, value in overrides.items():
+        if key in MAPPING or key in ("calibration", "feedback_entity"):
+            data["mapping_feedback"][key] = value
+        else:
+            data[key] = value
+    return data
+
+
+async def test_full_flow(hass: HomeAssistant, amsterdam, weather, cover) -> None:
+    """Site with HA location defaults, then the first panel as a subentry."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.FORM
+    schema = {str(k): k for k in result["data_schema"].schema}
+    assert schema["latitude"].default() == LAT
+    assert schema["longitude"].default() == LON
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_NAME: "Roof", "latitude": LAT, "longitude": LON}
+    )
+    assert result["errors"] == {"base": "wind_source_required"}
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAME: "Roof",
+            "latitude": LAT,
+            "longitude": LON,
+            "weather_entity": "weather.home",
+        },
+    )
+    assert result["step_id"] == "panel"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], panel_input(min_angle=50, max_angle=40)
+    )
+    assert result["errors"] == {"max_angle": "max_below_min"}
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], panel_input(min_angle=-10)
+    )
+    assert result["errors"] == {"min_angle": "tilt_range"}
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], panel_input(mapping="table")
+    )
+    assert result["errors"] == {"base": "calibration_required"}
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], panel_input(mapping="table", calibration="0:0, 30:80, 60:50")
+    )
+    assert result["errors"] == {"base": "invalid_mapping"}
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], panel_input()
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Roof"
+    entry = result["result"]
+    assert entry.data == {
+        "latitude": LAT,
+        "longitude": LON,
+        "weather_entity": "weather.home",
+    }
+    (sub,) = entry.subentries.values()
+    assert sub.title == "Garden"
+    assert sub.subentry_type == SUBENTRY_PANEL
+    assert sub.data["actuator_entity"] == "cover.panel"
+    assert sub.data["travel_time"] == 60
+    assert "feedback_entity" not in sub.data
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.garden_target_angle") is not None
+
+
+async def test_roll_axis_allows_negative(
+    hass: HomeAssistant, amsterdam, weather, cover
+) -> None:
+    """Roll trackers can go below zero."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAME: "Field",
+            "latitude": LAT,
+            "longitude": LON,
+            "weather_entity": "weather.home",
+        },
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        panel_input(
+            axis="roll", azimuth=270, min_angle=-45, max_angle=45, strategy="tracking"
+        ),
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+
+
+async def test_add_and_reconfigure_panel(
+    hass: HomeAssistant, setup_site, cover
+) -> None:
+    """Panels are added and changed from the integration page."""
+    entry = await setup_site()
+    cover2 = "cover.panel_two"
+    hass.states.async_set(cover2, "closed", {"current_position": 0})
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_PANEL), context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], panel_input()
+    )
+    assert result["errors"] == {"actuator_entity": "actuator_in_use"}
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], panel_input(**{CONF_NAME: "Shed", "actuator_entity": cover2})
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert len(entry.subentries) == 2
+    assert hass.states.get("sensor.shed_target_angle") is not None
+
+    sub = next(s for s in entry.subentries.values() if s.title == "Shed")
+    result = await entry.start_subentry_reconfigure_flow(hass, sub.subentry_id)
+    assert result["step_id"] == "reconfigure"
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        panel_input(
+            **{CONF_NAME: "Shed roof", "actuator_entity": cover2, "max_angle": 45}
+        ),
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+    sub = entry.subentries[sub.subentry_id]
+    assert sub.title == "Shed roof"
+    assert sub.data["max_angle"] == 45
+    panel = entry.runtime_data.panels[sub.subentry_id]
+    assert panel.cfg.max_angle == 45
+
+
+async def test_options(hass: HomeAssistant, setup_site) -> None:
+    """Thresholds are validated and applied with a reload."""
+    entry = await setup_site()
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    base = {
+        "wind_stow_speed": 40,
+        "wind_resume_speed": 45,
+        "calm_minutes": 5,
+        "storm_speed": 70,
+        "storm_hold_hours": 2,
+        "stale_minutes": 90,
+        "snow_mode": False,
+        "rain_mode": True,
+        "frost_mode": True,
+        "frost_temperature": -1,
+        "cloud_threshold": 70,
+        "min_move_interval": 2,
+        "manual_pause": 30,
+        "deadband": 1,
+        "hysteresis": 0.5,
+    }
+    result = await hass.config_entries.options.async_configure(result["flow_id"], base)
+    assert result["errors"] == {"wind_resume_speed": "resume_above_stow"}
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**base, "wind_resume_speed": 30, "storm_speed": 30}
+    )
+    assert result["errors"] == {"storm_speed": "storm_below_stow"}
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**base, "wind_resume_speed": 30}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    site = entry.runtime_data
+    assert site.safety.settings.wind_stow == 40
+    assert site.safety.settings.rain is True
+
+
+async def test_reconfigure_site(hass: HomeAssistant, setup_site) -> None:
+    """Location and weather sources can be changed."""
+    entry = await setup_site()
+    hass.states.async_set("sensor.wind", "5", {"unit_of_measurement": "km/h"})
+    result = await entry.start_reconfigure_flow(hass)
+    assert result["step_id"] == "reconfigure"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"latitude": 50.0, "longitude": 5.0}
+    )
+    assert result["errors"] == {"base": "wind_source_required"}
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"latitude": 50.0, "longitude": 5.0, "wind_sensor": "sensor.wind"},
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+    assert entry.data == {
+        "latitude": 50.0,
+        "longitude": 5.0,
+        "wind_sensor": "sensor.wind",
+    }
+    assert entry.runtime_data.latitude == 50.0
+    assert entry.runtime_data.weather_entity is None

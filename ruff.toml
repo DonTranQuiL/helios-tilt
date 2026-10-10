@@ -1,0 +1,19 @@
+# Integration CI lint gate — keep focused on the HA component + tests.
+exclude = [
+  "ai_engineer",
+  ".git",
+  ".venv",
+]
+
+target-version = "py312"
+line-length = 88
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+ignore = [
+  "E501",
+  "BLE001",  # broad Exception around flaky third-party/network calls
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["B011"]

@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect integration
+        id: integration
+        run: |
+          INTEGRATION=$(find custom_components -mindepth 1 -maxdepth 1 -type d | head -n 1 | xargs basename)
+
+          echo "integration=$INTEGRATION" >> $GITHUB_OUTPUT
+
+          echo "Detected integration: $INTEGRATION"
+
+      - name: Update manifest version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          # Pre-release tags -> PEP 440 (what Home Assistant and HACS expect):
+          # v3.0.0-beta.1 -> 3.0.0b1, v3.0.0-alpha.2 -> 3.0.0a2, v3.0.0-rc.1 -> 3.0.0rc1
+          VERSION=$(echo "$VERSION" | sed -E 's/-?(alpha|a)\.?([0-9]+)$/a\2/; s/-?(beta|b)\.?([0-9]+)$/b\2/; s/-?(rc|c)\.?([0-9]+)$/rc\2/')
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$'; then
+            echo "::error::Tag $GITHUB_REF_NAME does not map to a valid version ($VERSION)"
+            exit 1
+          fi
+          echo "Manifest version: $VERSION"
+          INTEGRATION=${{ steps.integration.outputs.integration }}
+
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+          MANIFEST="custom_components/$INTEGRATION/manifest.json"
+
+          tmp=$(mktemp)
+
+          jq --arg version "$VERSION" \
+            '.version = $version' \
+            "$MANIFEST" > "$tmp"
+
+          mv "$tmp" "$MANIFEST"
+
+          CONST="custom_components/$INTEGRATION/const.py"
+          if [ -f "$CONST" ] && grep -q '^VERSION = ' "$CONST"; then
+            sed -i "s/^VERSION = \".*\"/VERSION = \"$VERSION\"/" "$CONST"
+          fi
+
+          # The bundled card reports the same version (and is cache-busted by it).
+          for CARD in custom_components/$INTEGRATION/frontend/*.js; do
+            [ -f "$CARD" ] && sed -i "s/^const VERSION = \".*\";/const VERSION = \"$VERSION\";/" "$CARD"
+          done
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "Bump manifest version to ${{ github.ref_name }} [skip ci]"
+          file_pattern: "custom_components/**/manifest.json custom_components/**/const.py custom_components/**/frontend/*.js"
+          branch: main
+
+      - name: Create ZIP
+        run: |
+          INTEGRATION=${{ steps.integration.outputs.integration }}
+
+          cd custom_components/$INTEGRATION
+
+          zip -r "$INTEGRATION.zip" ./*
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v3
+        with:
+          files: custom_components/${{ steps.integration.outputs.integration }}/${{ steps.integration.outputs.integration }}.zip

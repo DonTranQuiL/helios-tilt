@@ -1,0 +1,55 @@
+{
+  "entity": {
+    "sensor": {
+      "target_angle": { "default": "mdi:angle-acute" },
+      "current_angle": { "default": "mdi:solar-panel" },
+      "last_move": {
+        "default": "mdi:history",
+        "state": {
+          "strategy": "mdi:white-balance-sunny",
+          "night": "mdi:weather-night",
+          "diffuse": "mdi:weather-cloudy",
+          "manual": "mdi:hand-back-right",
+          "wind": "mdi:weather-windy",
+          "storm": "mdi:weather-lightning",
+          "stow": "mdi:shield-sun",
+          "snow": "mdi:weather-snowy",
+          "rain": "mdi:weather-pouring",
+          "frost": "mdi:snowflake-thermometer",
+          "calibrate": "mdi:tune-vertical"
+        }
+      },
+      "moves_today": { "default": "mdi:counter" },
+      "gain": { "default": "mdi:trending-up" },
+      "pv_performance": { "default": "mdi:solar-power-variant" }
+    },
+    "select": {
+      "mode": {
+        "default": "mdi:sun-angle",
+        "state": {
+          "auto": "mdi:auto-mode",
+          "manual": "mdi:hand-back-right",
+          "fixed": "mdi:pin",
+          "seasonal": "mdi:calendar-sync",
+          "daily": "mdi:calendar-today",
+          "tracking": "mdi:sun-compass"
+        }
+      }
+    },
+    "number": { "manual_angle": { "default": "mdi:angle-acute" } },
+    "switch": {
+      "auto": { "default": "mdi:auto-mode", "state": { "off": "mdi:pause-circle-outline" } }
+    },
+    "binary_sensor": {
+      "storm": { "default": "mdi:weather-lightning", "state": { "off": "mdi:weather-partly-cloudy" } },
+      "wind_stow": { "default": "mdi:weather-windy", "state": { "off": "mdi:weather-windy-variant" } }
+    }
+  },
+  "services": {
+    "set_tilt": { "service": "mdi:angle-acute" },
+    "stow": { "service": "mdi:shield-sun" },
+    "resume_auto": { "service": "mdi:auto-mode" },
+    "set_mode": { "service": "mdi:sun-angle" },
+    "calibrate": { "service": "mdi:tune-vertical" }
+  }
+}
