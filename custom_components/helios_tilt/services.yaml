@@ -2,8 +2,6 @@ set_tilt:
   target:
     entity:
       integration: helios_tilt
-    device:
-      integration: helios_tilt
   fields:
     angle:
       required: true
@@ -18,8 +16,6 @@ stow:
   target:
     entity:
       integration: helios_tilt
-    device:
-      integration: helios_tilt
   fields:
     storm:
       default: false
@@ -29,13 +25,9 @@ resume_auto:
   target:
     entity:
       integration: helios_tilt
-    device:
-      integration: helios_tilt
 set_mode:
   target:
     entity:
-      integration: helios_tilt
-    device:
       integration: helios_tilt
   fields:
     mode:
@@ -53,8 +45,6 @@ set_mode:
 calibrate:
   target:
     entity:
-      integration: helios_tilt
-    device:
       integration: helios_tilt
   fields:
     angle:
