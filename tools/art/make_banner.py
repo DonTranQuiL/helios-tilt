@@ -1,5 +1,7 @@
 """Helios Tilt banner (1280x640)."""
+
 import math
+
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 W, H, SS = 1280, 640, 2
@@ -25,8 +27,12 @@ def glow(cx, cy, r, color, alpha):
     return lay.filter(ImageFilter.GaussianBlur(r * 0.6))
 
 
-img = Image.alpha_composite(img, glow(int(w * 0.2), int(h * 0.48), 430, (255, 150, 40), 70))
-img = Image.alpha_composite(img, glow(int(w * 0.88), int(h * 0.12), 300, (40, 190, 240), 50))
+img = Image.alpha_composite(
+    img, glow(int(w * 0.2), int(h * 0.48), 430, (255, 150, 40), 70)
+)
+img = Image.alpha_composite(
+    img, glow(int(w * 0.88), int(h * 0.12), 300, (40, 190, 240), 50)
+)
 
 # A row of small panels at the bottom, all tilted toward a sun arc.
 lines = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -48,7 +54,11 @@ while x < W - 60:
 img = Image.alpha_composite(img, lines.filter(ImageFilter.GaussianBlur(8 * SS)))
 img = Image.alpha_composite(img, lines)
 
-icon = Image.open("icon_512.png").convert("RGBA").resize((380 * SS, 380 * SS), Image.LANCZOS)
+icon = (
+    Image.open("icon_512.png")
+    .convert("RGBA")
+    .resize((380 * SS, 380 * SS), Image.LANCZOS)
+)
 ix, iy = 80 * SS, 90 * SS
 shadow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
 shadow.paste((0, 0, 0, 170), (ix + 10 * SS, iy + 24 * SS), icon.getchannel("A"))
@@ -62,11 +72,25 @@ size = 150
 while d.textlength("Helios Tilt", font=font("Black", size)) > maxw:
     size -= 2
 d.text((tx, 96 * SS), "Helios Tilt", font=font("Black", size), fill=(255, 255, 255))
-d.text((tx + 4 * SS, 252 * SS), "Solar panels that follow the sun", font=font("SemiBold", 38), fill=(226, 232, 240))
-d.text((tx + 4 * SS, 300 * SS), "and stow before the storm", font=font("SemiBold", 38), fill=(226, 232, 240))
+d.text(
+    (tx + 4 * SS, 252 * SS),
+    "Solar panels that follow the sun",
+    font=font("SemiBold", 38),
+    fill=(226, 232, 240),
+)
+d.text(
+    (tx + 4 * SS, 300 * SS),
+    "and stow before the storm",
+    font=font("SemiBold", 38),
+    fill=(226, 232, 240),
+)
 
-chips = [("Tracking + seasonal", (255, 181, 46)), ("Daily optimum", (255, 181, 46)),
-         ("Wind + storm stow", (70, 225, 255)), ("Cover / number / script", (70, 225, 255))]
+chips = [
+    ("Tracking + seasonal", (255, 181, 46)),
+    ("Daily optimum", (255, 181, 46)),
+    ("Wind + storm stow", (70, 225, 255)),
+    ("Cover / number / script", (70, 225, 255)),
+]
 chip_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
 cd = ImageDraw.Draw(chip_layer)
 cf = font("Bold", 24)
@@ -76,12 +100,24 @@ for i, (label, col) in enumerate(chips):
         cx, cy = tx + 4 * SS, cy + 60 * SS
     tw = cd.textlength(label, font=cf)
     pw, ph = tw + 40 * SS, 46 * SS
-    cd.rounded_rectangle([cx, cy, cx + pw, cy + ph], radius=ph // 2, fill=col + (34,), outline=col + (220,), width=2 * SS)
+    cd.rounded_rectangle(
+        [cx, cy, cx + pw, cy + ph],
+        radius=ph // 2,
+        fill=col + (34,),
+        outline=col + (220,),
+        width=2 * SS,
+    )
     cd.text((cx + 20 * SS, cy + ph / 2), label, font=cf, fill=col + (255,), anchor="lm")
     cx += pw + 14 * SS
 img = Image.alpha_composite(img, chip_layer)
 d = ImageDraw.Draw(img)
-d.text((w - 40 * SS, 40 * SS), "Home Assistant  \u00b7  HACS  \u00b7  DonTranQuiL", font=font("Medium", 22), fill=(148, 163, 184), anchor="ra")
+d.text(
+    (w - 40 * SS, 40 * SS),
+    "Home Assistant  \u00b7  HACS  \u00b7  DonTranQuiL",
+    font=font("Medium", 22),
+    fill=(148, 163, 184),
+    anchor="ra",
+)
 
 img = img.resize((W, H), Image.LANCZOS).convert("RGB")
 img.save("banner.png", optimize=True)
