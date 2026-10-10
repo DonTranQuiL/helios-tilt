@@ -1,7 +1,7 @@
 // Helios Tilt card: side view of each panel with the sun, wind gauge,
 // controls, today's angle plan and the last moves. Plain custom element, no
 // build step. Keep this file ASCII-only (use \u escapes).
-const VERSION = "0.1.0b2";
+const VERSION = "0.1.0b3";
 const DOMAIN = "helios_tilt";
 const DEG = "\u00b0";
 const DASH = "\u2013";
@@ -14,6 +14,8 @@ const I18N = {
     plan: "Today's plan", moves: "Last moves", no_moves: "No moves yet", gain: "today vs fixed", gain_now: "now",
     moves_today: "moves today", not_found: "No Helios Tilt panels found. Add the integration or pick a target angle sensor.",
     unavailable: "Unavailable", failed: "Action failed",
+    estimated: "estimated", uncertain: "Position uncertain", home: "Home", home_title: "Drive into the end stop to re-learn the position",
+    moving_open: "opening", moving_close: "closing", calibrating: "Timing the travel",
     status: {
       storm: "Storm mode", wind: "Wind stow", stowed: "Stowed", manual: "Manual", paused: "Paused after manual move",
       off: "Auto off", startup: "Waiting for data", stale: "Holding: no wind data", night: "Night park",
@@ -35,6 +37,8 @@ const I18N = {
     plan: "Plan voor vandaag", moves: "Laatste bewegingen", no_moves: "Nog geen bewegingen", gain: "vandaag t.o.v. vast", gain_now: "nu",
     moves_today: "bewegingen vandaag", not_found: "Geen Helios Tilt-panelen gevonden. Voeg de integratie toe of kies een doelhoeksensor.",
     unavailable: "Niet beschikbaar", failed: "Actie mislukt",
+    estimated: "geschat", uncertain: "Positie onzeker", home: "Referentie", home_title: "Tot de eindstop rijden om de positie opnieuw te bepalen",
+    moving_open: "opent", moving_close: "sluit", calibrating: "Looptijd meten",
     status: {
       storm: "Stormmodus", wind: "Wind: veilige stand", stowed: "Veilige stand", manual: "Handmatig",
       paused: "Gepauzeerd na handmatige beweging", off: "Auto uit", startup: "Wacht op data",
@@ -385,6 +389,12 @@ class HeliosTiltCard extends HTMLElement {
     const wind = get("wind");
     const storm = get("storm");
     const [label, cls] = statusOf(t, attrs, storm && storm.state === "on");
+    const cur = (currentState && currentState.attributes) || {};
+    const relays = cur.actuator_type === "relays";
+    const estimated = cur.source === "estimate" || cur.estimated === true;
+    const uncertain = relays && cur.position_uncertain === true;
+    const moving = cur.direction === "opening" ? t.moving_open : cur.direction === "closing" ? t.moving_close : "";
+    const calibrating = relays && cur.calibration && cur.calibration.phase;
     const detail = attrs.safety_detail || attrs.detail || "";
     const gainState = get("gain");
     const gain = num(gainState && gainState.state);
@@ -409,10 +419,12 @@ class HeliosTiltCard extends HTMLElement {
         <div class="name">${esc(name)}</div>
         <span class="chip ${cls}">${esc(label)}</span>
       </div>
+      ${uncertain || calibrating ? `<div class="badges">${uncertain ? `<span class="chip warn badge-uncertain">${esc(t.uncertain)}</span>` : ""}${calibrating ? `<span class="chip info">${esc(t.calibrating)}</span>` : ""}</div>` : ""}
       <div class="hero">
         ${sideView(attrs, current, target, cls)}
         <div class="figures">
-          <div class="big">${esc(deg(current))}</div>
+          <div class="big">${esc(deg(current))}${estimated ? `<span class="est">${esc(t.estimated)}</span>` : ""}</div>
+          ${moving ? `<div class="sub moving">${esc(moving)}</div>` : ""}
           <div class="sub">${esc(t.target)} ${esc(deg(target))}</div>
           ${detail ? `<div class="detail">${esc(detail)}</div>` : ""}
           <div class="sub">${esc(t.sun)} ${esc(deg(attrs.sun_azimuth))} / ${esc(deg(attrs.sun_elevation))}</div>
@@ -426,6 +438,7 @@ class HeliosTiltCard extends HTMLElement {
         <button data-action="auto" class="${active(!isManual && !isStow)}"${busy("auto")}>${esc(t.auto)}</button>
         <button data-action="stow" class="${active(isStow)}"${busy("stow")}>${esc(t.stow)}</button>
         <button data-action="manual" class="${active(isManual)}"${busy("manual")}>${esc(t.manual)}</button>
+        ${relays ? `<button data-action="home" class="${uncertain ? "attention" : ""}" title="${esc(t.home_title)}"${busy("home")}>${esc(t.home)}</button>` : ""}
       </div>
       <label class="slider"><span>${esc(t.angle)}</span>
         <input type="range" min="${esc(lo)}" max="${esc(hi)}" step="1" value="${esc(sliderValue)}"${busy("tilt")}>
@@ -478,6 +491,7 @@ class HeliosTiltCard extends HTMLElement {
           if (action === "auto") this._call("resume_auto", { entity_id: id }, key("auto"));
           else if (action === "stow") this._call("stow", { entity_id: id }, key("stow"));
           else if (action === "manual") this._call("set_mode", { entity_id: id, mode: "manual" }, key("manual"));
+          else if (action === "home") this._call("home", { entity_id: id }, key("home"));
         });
       });
       const slider = section.querySelector("input[type=range]");
@@ -541,7 +555,11 @@ const STYLE = `
   .mark.storm { background: var(--error-color, #d93b3b); }
   .gauge-labels { position: relative; height: 16px; font-size: .72em; color: var(--secondary-text-color); }
   .gauge-labels span { position: absolute; transform: translateX(-50%); white-space: nowrap; top: 2px; }
-  .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 8px; margin-top: 10px; }
+  button.attention { border-color: var(--warning-color, #f5a623); color: var(--warning-color, #f5a623); font-weight: 600; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 6px; }
+  .est { font-size: .4em; font-weight: 500; margin-left: 6px; padding: 1px 6px; border-radius: 6px; vertical-align: middle; color: var(--secondary-text-color); border: 1px dashed var(--secondary-text-color); }
+  .moving { font-style: italic; }
   button { font: inherit; padding: 8px 4px; border-radius: 8px; cursor: pointer; border: 1px solid var(--divider-color, rgba(127,127,127,.3)); background: transparent; color: var(--primary-text-color); }
   button.active { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: var(--text-primary-color, #fff); }
   button:disabled { opacity: .5; cursor: progress; }

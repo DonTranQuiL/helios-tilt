@@ -49,6 +49,7 @@ def test_card_calls_only_existing_services() -> None:
         "stow",
         "set_mode",
         "set_tilt",
+        "home",
     }
     for service, body in calls:
         assert service in services, service
@@ -122,6 +123,7 @@ async def test_card_in_browser(hass: HomeAssistant, setup_site, freezer) -> None
     data = await card_data(hass, entry)
     data["target"] = "sensor.garage_roof_target_angle"
     data["last"] = "sensor.garage_roof_last_move"
+    data["current"] = "sensor.garage_roof_current_angle"
     assert data["target"] in data["states"]
 
     result = await hass.async_add_executor_job(run_card, data)
@@ -168,6 +170,14 @@ async def test_card_in_browser(hass: HomeAssistant, setup_site, freezer) -> None
     assert c["fallback_history"] == 2
     assert c["not_found"] is True
     assert c["unavailable"] is True
+    assert c["relay_est"] == "estimated"
+    assert c["relay_badge"] == "Position uncertain"
+    assert c["relay_moving"] == "closing"
+    assert c["relay_buttons"] == ["auto", "stow", "manual", "home"]
+    assert c["relay_home_attention"] is True
+    assert ("home", {"entity_id": data["target"]}) in services
+    assert c["plain_est"] == 0
+    assert c["relay_nl"] == ["geschat", "Referentie"]
     assert c["nl_buttons"] == ["Auto", "Veilig", "Handmatig"]
     assert c["narrow_direction"] == "column"
     assert c["narrow_overflow"] is False

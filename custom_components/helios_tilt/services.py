@@ -1,4 +1,4 @@
-"""Actions: set_tilt, stow, resume_auto, set_mode, calibrate."""
+"""Actions: set_tilt, stow, resume_auto, set_mode, calibrate, home, calibrate_travel."""
 
 from __future__ import annotations
 
@@ -23,10 +23,15 @@ SERVICE_STOW = "stow"
 SERVICE_RESUME = "resume_auto"
 SERVICE_SET_MODE = "set_mode"
 SERVICE_CALIBRATE = "calibrate"
+SERVICE_HOME = "home"
+SERVICE_CALIBRATE_TRAVEL = "calibrate_travel"
 
 ATTR_ANGLE = "angle"
 ATTR_STORM = "storm"
 ATTR_MODE = "mode"
+ATTR_ACTION = "action"
+ATTR_HOMING_SECONDS = "homing_seconds"
+TRAVEL_ACTIONS = ["start", "stop", "cancel"]
 
 TARGET = {
     vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
@@ -40,6 +45,16 @@ STOW_SCHEMA = vol.Schema(
 )
 RESUME_SCHEMA = vol.Schema(TARGET)
 MODE_SCHEMA = vol.Schema({**TARGET, vol.Required(ATTR_MODE): vol.In(MODES)})
+HOME_SCHEMA = vol.Schema(TARGET)
+TRAVEL_SCHEMA = vol.Schema(
+    {
+        **TARGET,
+        vol.Required(ATTR_ACTION): vol.In(TRAVEL_ACTIONS),
+        vol.Optional(ATTR_HOMING_SECONDS): vol.All(
+            vol.Coerce(float), vol.Range(1, 300)
+        ),
+    }
+)
 
 
 # Action name -> schema (fields besides the target are documented in services.yaml).
@@ -49,6 +64,8 @@ SCHEMAS: dict[str, vol.Schema] = {
     SERVICE_RESUME: RESUME_SCHEMA,
     SERVICE_SET_MODE: MODE_SCHEMA,
     SERVICE_CALIBRATE: ANGLE_SCHEMA,
+    SERVICE_HOME: HOME_SCHEMA,
+    SERVICE_CALIBRATE_TRAVEL: TRAVEL_SCHEMA,
 }
 
 
@@ -152,6 +169,34 @@ def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_STOW, stow, schema=STOW_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_RESUME, resume, schema=RESUME_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_SET_MODE, set_mode, schema=MODE_SCHEMA)
+
+    def _relay_panels(call: ServiceCall) -> list[tuple[HeliosSite, Panel]]:
+        found = [
+            (site, panel)
+            for site, panels in resolve_panels(hass, call, require_target=True).items()
+            for panel in panels
+            if panel.driver is not None
+        ]
+        if not found:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="not_relays"
+            )
+        return found
+
+    async def home(call: ServiceCall) -> None:
+        for site, panel in _relay_panels(call):
+            site.async_home(panel)
+
+    async def calibrate_travel(call: ServiceCall) -> None:
+        for site, panel in _relay_panels(call):
+            site.async_travel_calibration(
+                panel, call.data[ATTR_ACTION], call.data.get(ATTR_HOMING_SECONDS)
+            )
+
     hass.services.async_register(
         DOMAIN, SERVICE_CALIBRATE, calibrate, schema=ANGLE_SCHEMA
+    )
+    hass.services.async_register(DOMAIN, SERVICE_HOME, home, schema=HOME_SCHEMA)
+    hass.services.async_register(
+        DOMAIN, SERVICE_CALIBRATE_TRAVEL, calibrate_travel, schema=TRAVEL_SCHEMA
     )

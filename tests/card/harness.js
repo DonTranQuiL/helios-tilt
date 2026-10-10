@@ -128,6 +128,23 @@ async function click(card, selector) {
     c.fallback_names = [...xss.shadowRoot.querySelectorAll(".name")].map((el) => el.textContent);
     c.fallback_history = xss.shadowRoot.querySelectorAll(".history li").length;
 
+    // Two relays (timed): estimated position, uncertain badge, Home button.
+    const relayStates = clone(DATA.states);
+    Object.assign(relayStates[DATA.current].attributes, {
+      actuator_type: "relays", source: "estimate", estimated: true, position_uncertain: true, direction: "closing",
+    });
+    const relayCard = await newCard({ entities: [DATA.target] }, makeHass(relayStates));
+    const rr = relayCard.shadowRoot;
+    c.relay_est = rr.querySelector(".big .est")?.textContent;
+    c.relay_badge = rr.querySelector(".badge-uncertain")?.textContent;
+    c.relay_moving = rr.querySelector(".moving")?.textContent;
+    c.relay_buttons = [...rr.querySelectorAll("button[data-action]")].map((b) => b.dataset.action);
+    c.relay_home_attention = rr.querySelector('button[data-action="home"]')?.classList.contains("attention");
+    await click(relayCard, 'button[data-action="home"]');
+    c.plain_est = root.querySelectorAll(".est, .badge-uncertain").length;
+    const relayNl = await newCard({ entities: [DATA.target] }, makeHass(relayStates, false, { language: "nl" }));
+    c.relay_nl = [relayNl.shadowRoot.querySelector(".est")?.textContent, relayNl.shadowRoot.querySelector('button[data-action="home"]')?.textContent];
+
     // Missing and unavailable.
     const none = await newCard({}, makeHass({}, false, { entities: {} }));
     c.not_found = text(none).includes("No Helios Tilt panels found");

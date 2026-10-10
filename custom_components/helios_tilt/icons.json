@@ -1,8 +1,12 @@
 {
   "entity": {
     "sensor": {
-      "target_angle": { "default": "mdi:angle-acute" },
-      "current_angle": { "default": "mdi:solar-panel" },
+      "target_angle": {
+        "default": "mdi:angle-acute"
+      },
+      "current_angle": {
+        "default": "mdi:solar-panel"
+      },
       "last_move": {
         "default": "mdi:history",
         "state": {
@@ -19,9 +23,15 @@
           "calibrate": "mdi:tune-vertical"
         }
       },
-      "moves_today": { "default": "mdi:counter" },
-      "gain": { "default": "mdi:trending-up" },
-      "pv_performance": { "default": "mdi:solar-power-variant" }
+      "moves_today": {
+        "default": "mdi:counter"
+      },
+      "gain": {
+        "default": "mdi:trending-up"
+      },
+      "pv_performance": {
+        "default": "mdi:solar-power-variant"
+      }
     },
     "select": {
       "mode": {
@@ -36,20 +46,75 @@
         }
       }
     },
-    "number": { "manual_angle": { "default": "mdi:angle-acute" } },
+    "number": {
+      "manual_angle": {
+        "default": "mdi:angle-acute"
+      }
+    },
     "switch": {
-      "auto": { "default": "mdi:auto-mode", "state": { "off": "mdi:pause-circle-outline" } }
+      "auto": {
+        "default": "mdi:auto-mode",
+        "state": {
+          "off": "mdi:pause-circle-outline"
+        }
+      }
     },
     "binary_sensor": {
-      "storm": { "default": "mdi:weather-lightning", "state": { "off": "mdi:weather-partly-cloudy" } },
-      "wind_stow": { "default": "mdi:weather-windy", "state": { "off": "mdi:weather-windy-variant" } }
+      "storm": {
+        "default": "mdi:weather-lightning",
+        "state": {
+          "off": "mdi:weather-partly-cloudy"
+        }
+      },
+      "wind_stow": {
+        "default": "mdi:weather-windy",
+        "state": {
+          "off": "mdi:weather-windy-variant"
+        }
+      },
+      "position_uncertain": {
+        "default": "mdi:help-rhombus-outline",
+        "state": {
+          "off": "mdi:check-circle-outline"
+        }
+      }
+    },
+    "button": {
+      "home": {
+        "default": "mdi:home-import-outline"
+      },
+      "travel_start": {
+        "default": "mdi:timer-play-outline"
+      },
+      "travel_mark": {
+        "default": "mdi:timer-stop-outline"
+      },
+      "travel_cancel": {
+        "default": "mdi:timer-cancel-outline"
+      }
     }
   },
   "services": {
-    "set_tilt": { "service": "mdi:angle-acute" },
-    "stow": { "service": "mdi:shield-sun" },
-    "resume_auto": { "service": "mdi:auto-mode" },
-    "set_mode": { "service": "mdi:sun-angle" },
-    "calibrate": { "service": "mdi:tune-vertical" }
+    "set_tilt": {
+      "service": "mdi:angle-acute"
+    },
+    "stow": {
+      "service": "mdi:shield-sun"
+    },
+    "resume_auto": {
+      "service": "mdi:auto-mode"
+    },
+    "set_mode": {
+      "service": "mdi:sun-angle"
+    },
+    "calibrate": {
+      "service": "mdi:tune-vertical"
+    },
+    "home": {
+      "service": "mdi:home-import-outline"
+    },
+    "calibrate_travel": {
+      "service": "mdi:timer-cog-outline"
+    }
   }
 }

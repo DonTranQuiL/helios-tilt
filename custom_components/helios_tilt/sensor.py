@@ -82,6 +82,34 @@ def _target_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
     }
 
 
+def _current_attrs(panel: Panel) -> dict[str, Any]:
+    attrs: dict[str, Any] = {
+        "source": panel.current_source,
+        "moving": panel.moving,
+        "commanded": panel.commanded,
+        "stuck": panel.stuck,
+        "actuator_type": panel.cfg.actuator_type,
+    }
+    if (driver := panel.driver) is not None:
+        position = driver.current_position()
+        cal = driver.calibration
+        attrs.update(
+            {
+                "estimated": True,
+                "position_uncertain": driver.uncertain,
+                "stroke": None if position is None else round(position, 1),
+                "direction": {1: "opening", -1: "closing"}.get(driver.direction),
+                "calibration": None
+                if cal is None
+                else {
+                    k: cal.get(k)
+                    for k in ("phase", "open_time", "close_time", "phase_started")
+                },
+            }
+        )
+    return attrs
+
+
 def _last_move_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
     last = panel.last_move
     return {
@@ -109,12 +137,7 @@ SENSORS: tuple[HeliosSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         value_fn=lambda site, panel: panel.current,
-        attrs_fn=lambda site, panel: {
-            "source": panel.current_source,
-            "moving": panel.moving,
-            "commanded": panel.commanded,
-            "stuck": panel.stuck,
-        },
+        attrs_fn=lambda site, panel: _current_attrs(panel),
     ),
     HeliosSensorDescription(
         key="last_move",

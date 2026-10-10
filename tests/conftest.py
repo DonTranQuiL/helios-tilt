@@ -146,7 +146,7 @@ def make_entry(
                 data=p,
                 subentry_type=SUBENTRY_PANEL,
                 title=p.get("title", f"Panel {i + 1}"),
-                unique_id=p["actuator_entity"],
+                unique_id=p.get("actuator_entity") or p["open_switch"],
             )
             for i, p in enumerate(panels)
         ],

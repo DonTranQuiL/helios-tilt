@@ -1,4 +1,4 @@
-"""Binary sensors: storm mode and wind stow."""
+"""Binary sensors: storm mode, wind stow and (two relays) position uncertain."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -58,6 +59,29 @@ BINARY_SENSORS: tuple[HeliosBinaryDescription, ...] = (
 )
 
 
+UNCERTAIN = HeliosBinaryDescription(
+    key="position_uncertain",
+    translation_key="position_uncertain",
+    device_class=BinarySensorDeviceClass.PROBLEM,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda site, panel: bool(panel.driver and panel.driver.uncertain),
+)
+
+
+def _relay_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
+    driver = panel.driver
+    assert driver is not None
+    position = driver.current_position()
+    return {
+        "stroke": None if position is None else round(position, 1),
+        "moves_since_home": driver.moves_since_home,
+        "travel_since_home": round(driver.travel_since_home),
+        "home_after_moves": driver.cfg.home_after_moves,
+        "last_homed": driver.last_homed.isoformat() if driver.last_homed else None,
+        "fault": driver.fault,
+    }
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HeliosConfigEntry,
@@ -66,10 +90,10 @@ async def async_setup_entry(
     """Per panel."""
     site = entry.runtime_data
     for panel in site.panels.values():
-        async_add_entities(
-            [HeliosBinarySensor(site, panel, d) for d in BINARY_SENSORS],
-            config_subentry_id=panel.id,
-        )
+        entities = [HeliosBinarySensor(site, panel, d) for d in BINARY_SENSORS]
+        if panel.driver is not None:
+            entities.append(HeliosBinarySensor(site, panel, UNCERTAIN))
+        async_add_entities(entities, config_subentry_id=panel.id)
 
 
 class HeliosBinarySensor(HeliosEntity, BinarySensorEntity):
@@ -84,5 +108,7 @@ class HeliosBinarySensor(HeliosEntity, BinarySensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Wind numbers for the card."""
+        """Wind numbers for the card (relay numbers for position uncertain)."""
+        if self.entity_description.key == UNCERTAIN.key:
+            return _relay_attrs(self.site, self.panel)
         return _wind_attrs(self.site, self.panel)

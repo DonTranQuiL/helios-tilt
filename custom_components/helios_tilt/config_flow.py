@@ -7,6 +7,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.config_entries import (
     ConfigEntry,
+    ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
     ConfigSubentryData,
@@ -21,13 +22,22 @@ from homeassistant.helpers import selector
 
 from .actuator import MappingError
 from .const import (
+    ACTUATOR_ENTITY,
+    ACTUATOR_RELAYS,
+    ACTUATOR_TYPES,
     AXES,
     AXIS_ROLL,
     CONF_ACTUATOR,
+    CONF_ACTUATOR_TYPE,
+    CONF_ANGLE_CLOSED,
+    CONF_ANGLE_OPEN,
     CONF_AXIS,
     CONF_AZIMUTH,
     CONF_CALIBRATION,
     CONF_CALM_MINUTES,
+    CONF_CLOSE_COUNTDOWN,
+    CONF_CLOSE_SWITCH,
+    CONF_CLOSE_TIME,
     CONF_CLOUD_THRESHOLD,
     CONF_DEADBAND,
     CONF_DIFFUSE_ANGLE,
@@ -36,6 +46,10 @@ from .const import (
     CONF_FROST_ANGLE,
     CONF_FROST_MODE,
     CONF_FROST_TEMP,
+    CONF_HOME_AFTER_MOVES,
+    CONF_HOME_AT_NIGHT,
+    CONF_HOME_END,
+    CONF_HOME_OVERRUN,
     CONF_HYSTERESIS,
     CONF_LATITUDE,
     CONF_LONGITUDE,
@@ -45,16 +59,21 @@ from .const import (
     CONF_MIN_ANGLE,
     CONF_MIN_INTERVAL,
     CONF_NIGHT_ANGLE,
+    CONF_OPEN_COUNTDOWN,
+    CONF_OPEN_SWITCH,
+    CONF_OPEN_TIME,
     CONF_POS_AT_MAX,
     CONF_POS_AT_MIN,
     CONF_PV_PEAK,
     CONF_PV_POWER,
     CONF_RAIN_ANGLE,
     CONF_RAIN_MODE,
+    CONF_REVERSE_DELAY,
     CONF_SEASON_WEIGHT,
     CONF_SNOW_ANGLE,
     CONF_SNOW_MODE,
     CONF_STALE_MINUTES,
+    CONF_START_DELAY,
     CONF_STEP,
     CONF_STORM_HOLD,
     CONF_STORM_SPEED,
@@ -70,6 +89,7 @@ from .const import (
     DOMAIN,
     FEEDBACK_ANGLE,
     FEEDBACK_POSITION,
+    HOME_ENDS,
     MAPPING_LINEAR,
     MAPPING_TABLE,
     NAME,
@@ -80,10 +100,28 @@ from .const import (
 )
 from .controller import PanelConfig
 
+SECTION_RELAYS = "relays"
 SECTION_MAPPING = "mapping_feedback"
 SECTION_POSITIONS = "positions"
 SECTION_PV = "pv"
-SECTIONS = (SECTION_MAPPING, SECTION_POSITIONS, SECTION_PV)
+SECTIONS = (SECTION_RELAYS, SECTION_MAPPING, SECTION_POSITIONS, SECTION_PV)
+
+RELAY_KEYS = (
+    CONF_OPEN_SWITCH,
+    CONF_CLOSE_SWITCH,
+    CONF_OPEN_COUNTDOWN,
+    CONF_CLOSE_COUNTDOWN,
+    CONF_OPEN_TIME,
+    CONF_CLOSE_TIME,
+    CONF_ANGLE_CLOSED,
+    CONF_ANGLE_OPEN,
+    CONF_START_DELAY,
+    CONF_HOME_OVERRUN,
+    CONF_REVERSE_DELAY,
+    CONF_HOME_AFTER_MOVES,
+    CONF_HOME_AT_NIGHT,
+    CONF_HOME_END,
+)
 
 MAPPING_KEYS = (
     CONF_MAPPING,
@@ -106,6 +144,7 @@ POSITION_KEYS = (
     CONF_SEASON_WEIGHT,
 )
 PV_KEYS = (CONF_PV_POWER, CONF_PV_PEAK)
+ATTR_HOMING = "homing_seconds"
 
 
 def _num(
@@ -250,9 +289,10 @@ def _panel_schema(values: dict[str, Any], with_name: bool) -> vol.Schema:
         fields[vol.Required(CONF_NAME, default=v.get(CONF_NAME, "Panel"))] = str
     fields.update(
         {
-            vol.Required(
-                CONF_ACTUATOR, default=v.get(CONF_ACTUATOR, vol.UNDEFINED)
-            ): selector.EntitySelector(
+            vol.Required(CONF_ACTUATOR_TYPE, default=v[CONF_ACTUATOR_TYPE]): _choice(
+                ACTUATOR_TYPES, CONF_ACTUATOR_TYPE
+            ),
+            _opt(CONF_ACTUATOR, v): selector.EntitySelector(
                 selector.EntitySelectorConfig(
                     domain=["cover", "number", "input_number", "script"]
                 )
@@ -267,6 +307,40 @@ def _panel_schema(values: dict[str, Any], with_name: bool) -> vol.Schema:
             ),
         }
     )
+    switch = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain=["switch", "input_boolean"])
+    )
+    countdown = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain=["number", "input_number"])
+    )
+    relays: dict[Any, Any] = {
+        _opt(CONF_OPEN_SWITCH, v): switch,
+        _opt(CONF_CLOSE_SWITCH, v): switch,
+        _opt(CONF_OPEN_COUNTDOWN, v): countdown,
+        _opt(CONF_CLOSE_COUNTDOWN, v): countdown,
+        vol.Required(CONF_OPEN_TIME, default=v[CONF_OPEN_TIME]): _num(1, 600, 0.1, "s"),
+        vol.Required(CONF_CLOSE_TIME, default=v[CONF_CLOSE_TIME]): _num(
+            1, 600, 0.1, "s"
+        ),
+        vol.Required(CONF_ANGLE_CLOSED, default=v[CONF_ANGLE_CLOSED]): _angle(),
+        vol.Required(CONF_ANGLE_OPEN, default=v[CONF_ANGLE_OPEN]): _angle(),
+        vol.Required(CONF_START_DELAY, default=v[CONF_START_DELAY]): _num(
+            0, 10, 0.1, "s"
+        ),
+        vol.Required(CONF_HOME_OVERRUN, default=v[CONF_HOME_OVERRUN]): _num(
+            5, 50, 1, "%"
+        ),
+        vol.Required(CONF_REVERSE_DELAY, default=v[CONF_REVERSE_DELAY]): _num(
+            0.3, 10, 0.1, "s"
+        ),
+        vol.Required(CONF_HOME_AFTER_MOVES, default=v[CONF_HOME_AFTER_MOVES]): _num(
+            0, 500, 1
+        ),
+        vol.Required(CONF_HOME_AT_NIGHT, default=v[CONF_HOME_AT_NIGHT]): bool,
+        vol.Required(CONF_HOME_END, default=v[CONF_HOME_END]): _choice(
+            HOME_ENDS, CONF_HOME_END
+        ),
+    }
     mapping: dict[Any, Any] = {
         vol.Required(CONF_MAPPING, default=v[CONF_MAPPING]): _choice(
             [MAPPING_LINEAR, MAPPING_TABLE], CONF_MAPPING
@@ -302,6 +376,10 @@ def _panel_schema(values: dict[str, Any], with_name: bool) -> vol.Schema:
         ),
         vol.Required(CONF_PV_PEAK, default=v[CONF_PV_PEAK]): _num(0, 1000000, 10, "W"),
     }
+    fields[vol.Required(SECTION_RELAYS)] = section(
+        vol.Schema(relays),
+        {"collapsed": v[CONF_ACTUATOR_TYPE] != ACTUATOR_RELAYS},
+    )
     fields[vol.Required(SECTION_MAPPING)] = section(
         vol.Schema(mapping), {"collapsed": True}
     )
@@ -317,13 +395,58 @@ def _flatten(user_input: dict[str, Any]) -> dict[str, Any]:
     for name in SECTIONS:
         data.update(user_input.get(name, {}))
     # Cleared optional fields: drop them so defaults apply.
-    for key in (CONF_FEEDBACK, CONF_PV_POWER, CONF_CALIBRATION):
+    for key in (
+        CONF_FEEDBACK,
+        CONF_PV_POWER,
+        CONF_CALIBRATION,
+        CONF_ACTUATOR,
+        CONF_OPEN_SWITCH,
+        CONF_CLOSE_SWITCH,
+        CONF_OPEN_COUNTDOWN,
+        CONF_CLOSE_COUNTDOWN,
+    ):
         if not data.get(key):
+            data.pop(key, None)
+    data.setdefault(CONF_ACTUATOR_TYPE, ACTUATOR_ENTITY)
+    if data[CONF_ACTUATOR_TYPE] == ACTUATOR_RELAYS:
+        data.pop(CONF_ACTUATOR, None)
+    else:
+        for key in RELAY_KEYS:
             data.pop(key, None)
     return data
 
 
+def _unique_id(data: dict[str, Any]) -> str:
+    """The actuator (or the open relay) identifies a panel."""
+    if data[CONF_ACTUATOR_TYPE] == ACTUATOR_RELAYS:
+        return data[CONF_OPEN_SWITCH]
+    return data[CONF_ACTUATOR]
+
+
+def _validate_relays(data: dict[str, Any]) -> dict[str, str]:
+    open_switch, close_switch = data.get(CONF_OPEN_SWITCH), data.get(CONF_CLOSE_SWITCH)
+    if not open_switch or not close_switch:
+        return {"base": "relays_required"}
+    if open_switch == close_switch:
+        return {"base": "same_relay"}
+    countdowns = [data.get(CONF_OPEN_COUNTDOWN), data.get(CONF_CLOSE_COUNTDOWN)]
+    if countdowns[0] and countdowns[0] == countdowns[1]:
+        return {"base": "same_countdown"}
+    closed, opened = data[CONF_ANGLE_CLOSED], data[CONF_ANGLE_OPEN]
+    if closed == opened:
+        return {"base": "same_end_angles"}
+    lo, hi = sorted((closed, opened))
+    if data[CONF_MIN_ANGLE] < lo - 0.5 or data[CONF_MAX_ANGLE] > hi + 0.5:
+        return {"base": "limits_outside_stroke"}
+    return {}
+
+
 def _validate_panel(data: dict[str, Any]) -> dict[str, str]:
+    if data[CONF_ACTUATOR_TYPE] == ACTUATOR_RELAYS:
+        if errors := _validate_relays(data):
+            return errors
+    elif not data.get(CONF_ACTUATOR):
+        return {CONF_ACTUATOR: "actuator_required"}
     lo, hi = data[CONF_MIN_ANGLE], data[CONF_MAX_ANGLE]
     if hi <= lo:
         return {CONF_MAX_ANGLE: "max_below_min"}
@@ -388,7 +511,7 @@ class HeliosConfigFlow(ConfigFlow, domain=DOMAIN):
         """The first panel."""
         errors: dict[str, str] = {}
         values: dict[str, Any] = {}
-        if user_input is not None and CONF_ACTUATOR in user_input:
+        if user_input is not None:
             data = _flatten(user_input)
             values = data
             errors = _validate_panel(data)
@@ -404,7 +527,7 @@ class HeliosConfigFlow(ConfigFlow, domain=DOMAIN):
                             data=data,
                             subentry_type=SUBENTRY_PANEL,
                             title=title,
-                            unique_id=data[CONF_ACTUATOR],
+                            unique_id=_unique_id(data),
                         )
                     ],
                 )
@@ -468,12 +591,12 @@ class PanelSubentryFlow(ConfigSubentryFlow):
             data = _flatten(user_input)
             values = data
             errors = _validate_panel(data)
-            if not errors and self._taken(data[CONF_ACTUATOR]):
-                errors = {CONF_ACTUATOR: "actuator_in_use"}
+            if not errors and self._taken(_unique_id(data)):
+                errors = {"base": "actuator_in_use"}
             if not errors:
                 title = data.pop(CONF_NAME)
                 return self.async_create_entry(
-                    title=title, data=data, unique_id=data[CONF_ACTUATOR]
+                    title=title, data=data, unique_id=_unique_id(data)
                 )
         return self.async_show_form(
             step_id="user", data_schema=_panel_schema(values, True), errors=errors
@@ -482,7 +605,18 @@ class PanelSubentryFlow(ConfigSubentryFlow):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """Change a panel."""
+        """Change a panel; relay panels can also time their travel."""
+        subentry = self._get_reconfigure_subentry()
+        if subentry.data.get(CONF_ACTUATOR_TYPE) == ACTUATOR_RELAYS:
+            return self.async_show_menu(
+                step_id="reconfigure", menu_options=["settings", "travel"]
+            )
+        return await self.async_step_settings(user_input)
+
+    async def async_step_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Change a panel's settings."""
         entry = self._get_entry()
         subentry = self._get_reconfigure_subentry()
         errors: dict[str, str] = {}
@@ -491,8 +625,8 @@ class PanelSubentryFlow(ConfigSubentryFlow):
             data = _flatten(user_input)
             values = data
             errors = _validate_panel(data)
-            if not errors and self._taken(data[CONF_ACTUATOR], subentry.subentry_id):
-                errors = {CONF_ACTUATOR: "actuator_in_use"}
+            if not errors and self._taken(_unique_id(data), subentry.subentry_id):
+                errors = {"base": "actuator_in_use"}
             if not errors:
                 title = data.pop(CONF_NAME)
                 return self.async_update_and_abort(
@@ -500,10 +634,139 @@ class PanelSubentryFlow(ConfigSubentryFlow):
                     subentry,
                     title=title,
                     data=data,
-                    unique_id=data[CONF_ACTUATOR],
+                    unique_id=_unique_id(data),
                 )
         return self.async_show_form(
-            step_id="reconfigure",
+            step_id="settings",
             data_schema=_panel_schema(values, True),
             errors=errors,
         )
+
+    # ---- guided travel-time calibration (two relays) -------------------------------
+
+    def _panel(self) -> tuple[Any, Any] | None:
+        entry = self._get_entry()
+        if entry.state is not ConfigEntryState.LOADED:
+            return None
+        site = entry.runtime_data
+        panel = site.panels.get(self._get_reconfigure_subentry().subentry_id)
+        if panel is None or panel.driver is None:
+            return None
+        return site, panel
+
+    async def async_step_travel(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Explain, then close fully (homing) and start opening."""
+        found = self._panel()
+        if found is None:
+            return self.async_abort(reason="not_loaded")
+        site, panel = found
+        default = round(panel.driver.cfg.max_run)
+        if user_input is not None:
+            self._calibrating = True
+            site.async_travel_calibration(
+                panel, "start", user_input[ATTR_HOMING], autosave=False
+            )
+            return await self.async_step_travel_open()
+        return self.async_show_form(
+            step_id="travel",
+            data_schema=vol.Schema(
+                {vol.Required(ATTR_HOMING, default=default): _num(5, 300, 1, "s")}
+            ),
+            description_placeholders={"panel": panel.title},
+        )
+
+    async def _async_mark(
+        self, phase: str, user_input: dict[str, Any] | None
+    ) -> dict[str, str] | None:
+        """Submit = the end is reached. None when marked, else form errors."""
+        found = self._panel()
+        if found is None:
+            return {"base": "calibration_failed"}
+        _site, panel = found
+        cal = panel.driver.calibration
+        if user_input is None:
+            return {}
+        if cal is None:
+            return {"base": "calibration_failed"}
+        if cal["phase"] == "homing" or (
+            cal["phase"] == phase and "timing_started" not in cal
+        ):
+            return {"base": "still_homing"}
+        if cal["phase"] != phase:
+            return {"base": "calibration_failed"}
+        if not panel.driver.async_calibration_mark():
+            return {"base": "still_homing"}  # the relay is not on yet
+        return None
+
+    async def async_step_travel_open(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Submit the moment the actuator reaches the open end."""
+        errors = await self._async_mark("opening", user_input)
+        if errors is None:
+            return await self.async_step_travel_close()
+        if errors.get("base") == "calibration_failed":
+            return self.async_abort(reason="calibration_failed")
+        return self.async_show_form(
+            step_id="travel_open", data_schema=vol.Schema({}), errors=errors
+        )
+
+    async def async_step_travel_close(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Submit the moment the actuator reaches the closed end."""
+        errors = await self._async_mark("closing", user_input)
+        if errors is None:
+            return await self.async_step_travel_result()
+        if errors.get("base") == "calibration_failed":
+            return self.async_abort(reason="calibration_failed")
+        return self.async_show_form(
+            step_id="travel_close", data_schema=vol.Schema({}), errors=errors
+        )
+
+    async def async_step_travel_result(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """The measured times (editable) and the angles at both ends."""
+        entry = self._get_entry()
+        subentry = self._get_reconfigure_subentry()
+        values = {**PANEL_DEFAULTS, **subentry.data}
+        if user_input is not None:
+            self._calibrating = False
+            return self.async_update_and_abort(
+                entry, subentry, data={**subentry.data, **user_input}
+            )
+        found = self._panel()
+        cal = (found[1].driver.calibration if found else None) or {}
+        return self.async_show_form(
+            step_id="travel_result",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_OPEN_TIME,
+                        default=cal.get("open_time") or values[CONF_OPEN_TIME],
+                    ): _num(1, 600, 0.1, "s"),
+                    vol.Required(
+                        CONF_CLOSE_TIME,
+                        default=cal.get("close_time") or values[CONF_CLOSE_TIME],
+                    ): _num(1, 600, 0.1, "s"),
+                    vol.Required(
+                        CONF_ANGLE_CLOSED, default=values[CONF_ANGLE_CLOSED]
+                    ): _angle(),
+                    vol.Required(
+                        CONF_ANGLE_OPEN, default=values[CONF_ANGLE_OPEN]
+                    ): _angle(),
+                }
+            ),
+        )
+
+    @callback
+    def async_remove(self) -> None:
+        """The dialog was closed mid-calibration: stop the relays."""
+        if not getattr(self, "_calibrating", False):
+            return
+        found = self._panel()
+        if found is not None and found[1].driver.calibrating:
+            found[0].async_travel_calibration(found[1], "cancel")

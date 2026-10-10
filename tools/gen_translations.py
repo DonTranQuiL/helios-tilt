@@ -463,6 +463,284 @@ T = {
     },
 }
 
+# ---- two relays (timed) -------------------------------------------------------
+PANEL["en"]["actuator_type"] = "Actuator type"
+PANEL["nl"]["actuator_type"] = "Type actuator"
+PANEL_DESC["en"]["actuator_type"] = (
+    "An existing entity (cover, number or script), or two relays (open + close) driving a dumb actuator by time."
+)
+PANEL_DESC["nl"]["actuator_type"] = (
+    "Een bestaande entiteit (cover, number of script), of twee relais (open + dicht) die een domme actuator op tijd aansturen."
+)
+PANEL_DESC["en"]["actuator_entity"] += " Only for the entity type."
+PANEL_DESC["nl"]["actuator_entity"] += " Alleen voor het type entiteit."
+SECTIONS["en"] = {
+    "relays": (
+        "Two relays (timed)",
+        {
+            "open_switch": "Open relay (extends)",
+            "close_switch": "Close relay (retracts)",
+            "open_countdown": "Open relay countdown",
+            "close_countdown": "Close relay countdown",
+            "open_time": "Full open time",
+            "close_time": "Full close time",
+            "angle_closed": "Panel angle when fully closed",
+            "angle_open": "Panel angle when fully open",
+            "start_delay": "Start delay",
+            "home_overrun": "Homing overrun",
+            "reverse_delay": "Direction change pause",
+            "home_after_moves": "Home after this many moves",
+            "home_at_night": "Home at the night park",
+            "home_end": "Home against",
+        },
+        {
+            "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.<name>_l1). The actuator must have its own limit switches.",
+            "close_switch": "Switch that makes it retract (switch.<name>_l2). Never both on: Helios switches the other one off first.",
+            "open_countdown": "Optional, e.g. number.<name>_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
+            "close_countdown": "Optional, e.g. number.<name>_countdown_l2.",
+            "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
+            "close_time": "Seconds from fully open to fully closed (often different).",
+            "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
+            "start_delay": "Seconds the motor needs before it moves. Usually 0.",
+            "home_overrun": "Runs to an end stop keep going this % of the travel time longer, so the estimate re-syncs.",
+            "reverse_delay": "Pause after a run before going the other way.",
+            "home_after_moves": "Drift builds up with every move; home again after this many moves (0 = only when needed).",
+            "home_at_night": "Drive into the home end stop before the night park.",
+        },
+    ),
+    **SECTIONS["en"],
+}
+SECTIONS["en"]["mapping_feedback"][2]["calibration"] = (
+    "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100. Two relays: angle:stroke% (0 = fully closed)."
+)
+SECTIONS["nl"] = {
+    "relays": (
+        "Twee relais (op tijd)",
+        {
+            "open_switch": "Open-relais (uitschuiven)",
+            "close_switch": "Dicht-relais (intrekken)",
+            "open_countdown": "Afteltijd open-relais",
+            "close_countdown": "Afteltijd dicht-relais",
+            "open_time": "Looptijd volledig open",
+            "close_time": "Looptijd volledig dicht",
+            "angle_closed": "Paneelhoek volledig dicht",
+            "angle_open": "Paneelhoek volledig open",
+            "start_delay": "Startvertraging",
+            "home_overrun": "Doorloop bij homen",
+            "reverse_delay": "Pauze bij richtingwissel",
+            "home_after_moves": "Homen na zoveel bewegingen",
+            "home_at_night": "Homen bij de nachtstand",
+            "home_end": "Homen tegen",
+        },
+        {
+            "open_switch": "Schakelaar waarmee de actuator uitschuift (Zigbee2MQTT: switch.<naam>_l1). De actuator moet eigen eindschakelaars hebben.",
+            "close_switch": "Schakelaar waarmee hij intrekt (switch.<naam>_l2). Nooit allebei aan: Helios zet eerst de andere uit.",
+            "open_countdown": "Optioneel, bijv. number.<naam>_countdown_l1. Wordt bij elke beweging gezet als hardwarebeveiliging: het relais schakelt zelf uit, ook als Home Assistant stopt.",
+            "close_countdown": "Optioneel, bijv. number.<naam>_countdown_l2.",
+            "open_time": "Seconden van volledig dicht naar volledig open. Meet het via Opnieuw configureren > Looptijd meten.",
+            "close_time": "Seconden van volledig open naar volledig dicht (vaak anders).",
+            "angle_closed": "Meet de hoek van het paneel (of raam) aan beide uiteinden; de slag wordt daartussen lineair omgerekend, of gebruik een kalibratietabel met hoek:slag%-paren.",
+            "start_delay": "Seconden die de motor nodig heeft voor hij beweegt. Meestal 0.",
+            "home_overrun": "Bewegingen naar een eindstop lopen zoveel % van de looptijd langer door, zodat de schatting weer klopt.",
+            "reverse_delay": "Pauze na een beweging voordat de andere kant op wordt gestuurd.",
+            "home_after_moves": "Bij elke beweging groeit de afwijking; na zoveel bewegingen opnieuw homen (0 = alleen als het nodig is).",
+            "home_at_night": "Voor de nachtstand eerst tegen de home-eindstop rijden.",
+        },
+    ),
+    **SECTIONS["nl"],
+}
+SECTIONS["nl"]["mapping_feedback"][2]["calibration"] = (
+    "hoek:positie paren, bijv. 0:0, 15:22, 30:47, 45:75, 60:100. Twee relais: hoek:slag% (0 = volledig dicht)."
+)
+ERRORS["en"].update(
+    {
+        "actuator_required": "Choose the actuator entity, or pick the two relays type.",
+        "relays_required": "Choose both the open and the close relay (in the Two relays section).",
+        "same_relay": "The open and close relay must be different switches.",
+        "same_countdown": "The two countdowns must be different entities.",
+        "same_end_angles": "The angles at fully closed and fully open must differ.",
+        "limits_outside_stroke": "The minimum and maximum angle must lie between the angles at fully closed and fully open.",
+        "still_homing": "Still closing. Wait until it has closed fully and starts to open, then submit when it reaches the open end.",
+        "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off.",
+    }
+)
+ERRORS["nl"].update(
+    {
+        "actuator_required": "Kies de actuator-entiteit, of kies het type twee relais.",
+        "relays_required": "Kies zowel het open- als het dicht-relais (in de sectie Twee relais).",
+        "same_relay": "Het open- en dicht-relais moeten verschillende schakelaars zijn.",
+        "same_countdown": "De twee afteltijden moeten verschillende entiteiten zijn.",
+        "same_end_angles": "De hoeken bij volledig dicht en volledig open moeten verschillen.",
+        "limits_outside_stroke": "De minimale en maximale hoek moeten tussen de hoeken bij volledig dicht en volledig open liggen.",
+        "still_homing": "Nog aan het sluiten. Wacht tot hij helemaal dicht is en begint te openen, en bevestig als hij het open eind bereikt.",
+        "calibration_failed": "De kalibratie is gestopt (een relais reageerde niet, of het duurde te lang). Beide relais zijn uit.",
+    }
+)
+TRAVEL = {
+    "en": {
+        "menu_title": "Change panel",
+        "menu": {"settings": "Settings", "travel": "Time the travel (calibrate)"},
+        "travel": (
+            "Time the travel: {panel}",
+            "Keep the actuator in sight and stay clear of it. On submit it first closes fully (homing) for the time below, then starts opening. On the next screen, submit the moment it reaches the fully open end.",
+            {"homing_seconds": "Homing time"},
+            {
+                "homing_seconds": "Long enough to close fully from anywhere, plus a margin."
+            },
+        ),
+        "travel_open": (
+            "Opening...",
+            "It closes first, then opens. Submit the moment it stops at the fully open end.",
+        ),
+        "travel_close": (
+            "Closing...",
+            "Now it closes. Submit the moment it stops at the fully closed end.",
+        ),
+        "travel_result": (
+            "Measured travel",
+            "Check the measured times and enter the panel angle at both ends.",
+            {
+                "open_time": "Full open time",
+                "close_time": "Full close time",
+                "angle_closed": "Panel angle when fully closed",
+                "angle_open": "Panel angle when fully open",
+            },
+        ),
+        "not_loaded": "Load the integration first.",
+        "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off.",
+    },
+    "nl": {
+        "menu_title": "Paneel wijzigen",
+        "menu": {"settings": "Instellingen", "travel": "Looptijd meten (kalibreren)"},
+        "travel": (
+            "Looptijd meten: {panel}",
+            "Houd de actuator in het zicht en blijf er uit de buurt. Na bevestigen sluit hij eerst volledig (homen) gedurende de tijd hieronder, daarna begint hij te openen. Bevestig op het volgende scherm zodra hij het volledig open eind bereikt.",
+            {"homing_seconds": "Home-tijd"},
+            {
+                "homing_seconds": "Lang genoeg om vanaf elke stand helemaal te sluiten, plus marge."
+            },
+        ),
+        "travel_open": (
+            "Openen...",
+            "Eerst sluit hij, dan opent hij. Bevestig zodra hij stopt op het volledig open eind.",
+        ),
+        "travel_close": (
+            "Sluiten...",
+            "Nu sluit hij. Bevestig zodra hij stopt op het volledig dichte eind.",
+        ),
+        "travel_result": (
+            "Gemeten looptijd",
+            "Controleer de gemeten tijden en vul de paneelhoek aan beide uiteinden in.",
+            {
+                "open_time": "Looptijd volledig open",
+                "close_time": "Looptijd volledig dicht",
+                "angle_closed": "Paneelhoek volledig dicht",
+                "angle_open": "Paneelhoek volledig open",
+            },
+        ),
+        "not_loaded": "Laad eerst de integratie.",
+        "calibration_failed": "De kalibratie is gestopt (een relais reageerde niet, of het duurde te lang). Beide relais zijn uit.",
+    },
+}
+RELAY_T = {
+    "en": {
+        "binary_sensor": {"position_uncertain": "Position uncertain"},
+        "button": {
+            "home": "Home now",
+            "travel_start": "Travel calibration: start",
+            "travel_mark": "Travel calibration: end reached",
+            "travel_cancel": "Travel calibration: cancel",
+        },
+        "selectors": {
+            "actuator_type": {
+                "entity": "Entity (cover, number or script)",
+                "relays": "Two relays (timed)",
+            },
+            "home_end": {
+                "closed": "Fully closed",
+                "open": "Fully open",
+                "nearest": "Nearest end",
+            },
+            "travel_action": {
+                "start": "Start (close fully, then open)",
+                "stop": "End reached",
+                "cancel": "Cancel",
+            },
+        },
+        "services": {
+            "home": (
+                "Home now",
+                "Panels on two relays: drive into the home end stop to re-sync the estimate, then back to the target.",
+                {},
+            ),
+            "calibrate_travel": (
+                "Time the travel",
+                "Panels on two relays: start closes fully, then opens; call stop when it reaches the open end, and again at the closed end. The times are saved.",
+                {
+                    "action": ("Action", "start, stop (end reached) or cancel."),
+                    "homing_seconds": (
+                        "Homing time",
+                        "How long to close first. Default: the maximum run time.",
+                    ),
+                },
+            ),
+        },
+        "not_relays": "Choose a panel driven by two relays.",
+        "fault_title": "{panel}: relay problem",
+        "fault_desc": "{fault}. Both relays were switched off and the position is marked uncertain; the next move homes first. Check the relay device, its Zigbee link and the wiring. This clears after the next successful move.",
+    },
+    "nl": {
+        "binary_sensor": {"position_uncertain": "Positie onzeker"},
+        "button": {
+            "home": "Nu homen",
+            "travel_start": "Looptijd meten: start",
+            "travel_mark": "Looptijd meten: eind bereikt",
+            "travel_cancel": "Looptijd meten: annuleren",
+        },
+        "selectors": {
+            "actuator_type": {
+                "entity": "Entiteit (cover, number of script)",
+                "relays": "Twee relais (op tijd)",
+            },
+            "home_end": {
+                "closed": "Volledig dicht",
+                "open": "Volledig open",
+                "nearest": "Dichtstbijzijnde eind",
+            },
+            "travel_action": {
+                "start": "Start (helemaal dicht, dan open)",
+                "stop": "Eind bereikt",
+                "cancel": "Annuleren",
+            },
+        },
+        "services": {
+            "home": (
+                "Nu homen",
+                "Panelen op twee relais: rij tegen de home-eindstop om de schatting gelijk te zetten, dan terug naar het doel.",
+                {},
+            ),
+            "calibrate_travel": (
+                "Looptijd meten",
+                "Panelen op twee relais: start sluit volledig en opent dan; roep stop aan bij het open eind, en nog eens bij het dichte eind. De tijden worden opgeslagen.",
+                {
+                    "action": ("Actie", "start, stop (eind bereikt) of cancel."),
+                    "homing_seconds": (
+                        "Home-tijd",
+                        "Hoe lang eerst te sluiten. Standaard: de maximale looptijd.",
+                    ),
+                },
+            ),
+        },
+        "not_relays": "Kies een paneel dat met twee relais wordt aangestuurd.",
+        "fault_title": "{panel}: probleem met een relais",
+        "fault_desc": "{fault}. Beide relais zijn uitgeschakeld en de positie is als onzeker gemarkeerd; de volgende beweging homet eerst. Controleer het relaisapparaat, de Zigbee-verbinding en de bedrading. De melding verdwijnt na de volgende geslaagde beweging.",
+    },
+}
+for _lang in ("en", "nl"):
+    T[_lang]["entities"]["binary_sensor"].update(RELAY_T[_lang]["binary_sensor"])
+    T[_lang]["services"].update(RELAY_T[_lang]["services"])
+    T[_lang]["exceptions"]["not_relays"] = RELAY_T[_lang]["not_relays"]
+
 
 def panel_step(lang: str, title: str, desc: str | None) -> dict:
     step = {
@@ -484,6 +762,8 @@ def build(lang: str) -> dict:
     site_data = SITE[lang]
     reconf_data = {k: v for k, v in site_data.items() if k != "name"}
     ent = t["entities"]
+    tr = TRAVEL[lang]
+    rt = RELAY_T[lang]
     return {
         "config": {
             "step": {
@@ -512,10 +792,37 @@ def build(lang: str) -> dict:
                 "entry_type": t["panel_type"],
                 "step": {
                     "user": panel_step(lang, t["panel_user_title"], None),
-                    "reconfigure": panel_step(lang, t["panel_reconf_title"], None),
+                    "reconfigure": {
+                        "title": tr["menu_title"],
+                        "menu_options": tr["menu"],
+                    },
+                    "settings": panel_step(lang, t["panel_reconf_title"], None),
+                    "travel": {
+                        "title": tr["travel"][0],
+                        "description": tr["travel"][1],
+                        "data": tr["travel"][2],
+                        "data_description": tr["travel"][3],
+                    },
+                    "travel_open": {
+                        "title": tr["travel_open"][0],
+                        "description": tr["travel_open"][1],
+                    },
+                    "travel_close": {
+                        "title": tr["travel_close"][0],
+                        "description": tr["travel_close"][1],
+                    },
+                    "travel_result": {
+                        "title": tr["travel_result"][0],
+                        "description": tr["travel_result"][1],
+                        "data": tr["travel_result"][2],
+                    },
                 },
                 "error": ERRORS[lang],
-                "abort": {"reconfigure_successful": t["reconf_ok"]},
+                "abort": {
+                    "reconfigure_successful": t["reconf_ok"],
+                    "not_loaded": tr["not_loaded"],
+                    "calibration_failed": tr["calibration_failed"],
+                },
             }
         },
         "options": {
@@ -543,6 +850,7 @@ def build(lang: str) -> dict:
             "number": {"manual_angle": {"name": ent["number"]}},
             "switch": {"auto": {"name": ent["switch"]}},
             "binary_sensor": {k: {"name": v} for k, v in ent["binary_sensor"].items()},
+            "button": {k: {"name": v} for k, v in rt["button"].items()},
         },
         "selector": {
             "axis": {"options": t["selectors"]["axis"]},
@@ -550,6 +858,7 @@ def build(lang: str) -> dict:
             "mapping": {"options": t["selectors"]["mapping"]},
             "feedback_kind": {"options": t["selectors"]["feedback_kind"]},
             "mode": {"options": MODE[lang]},
+            **{k: {"options": v} for k, v in rt["selectors"].items()},
         },
         "services": {
             key: {
@@ -573,7 +882,11 @@ def build(lang: str) -> dict:
             "actuator_stuck": {
                 "title": t["issue_title"],
                 "description": t["issue_desc"],
-            }
+            },
+            "relay_fault": {
+                "title": rt["fault_title"],
+                "description": rt["fault_desc"],
+            },
         },
     }
 

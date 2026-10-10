@@ -28,18 +28,53 @@
           "min_angle": "Minimale hoek",
           "max_angle": "Maximale hoek",
           "step": "Stap",
-          "strategy": "Strategie"
+          "strategy": "Strategie",
+          "actuator_type": "Type actuator"
         },
         "data_description": {
-          "actuator_entity": "Een cover (set_cover_position), een number / input_number of een script (krijgt angle, position en panel als variabelen).",
+          "actuator_entity": "Een cover (set_cover_position), een number / input_number of een script (krijgt angle, position en panel als variabelen). Alleen voor het type entiteit.",
           "axis": "Kantelen: het paneel helt naar de azimut (0 = plat). Rollen: een eenassige tracker; negatieve hoeken kantelen de andere kant op.",
           "azimuth": "Kantelen: de richting waarin het paneel kijkt (180 = zuid). Rollen: de richting van positieve kanteling (as + 90).",
           "min_angle": "Zachte grens, er wordt nooit lager gestuurd.",
           "max_angle": "Zachte grens, er wordt nooit hoger gestuurd.",
           "step": "Doelhoeken worden op deze stap afgerond (0 = niet afronden).",
-          "strategy": "Hoe de hoek in automatische modus wordt gekozen."
+          "strategy": "Hoe de hoek in automatische modus wordt gekozen.",
+          "actuator_type": "Een bestaande entiteit (cover, number of script), of twee relais (open + dicht) die een domme actuator op tijd aansturen."
         },
         "sections": {
+          "relays": {
+            "name": "Twee relais (op tijd)",
+            "data": {
+              "open_switch": "Open-relais (uitschuiven)",
+              "close_switch": "Dicht-relais (intrekken)",
+              "open_countdown": "Afteltijd open-relais",
+              "close_countdown": "Afteltijd dicht-relais",
+              "open_time": "Looptijd volledig open",
+              "close_time": "Looptijd volledig dicht",
+              "angle_closed": "Paneelhoek volledig dicht",
+              "angle_open": "Paneelhoek volledig open",
+              "start_delay": "Startvertraging",
+              "home_overrun": "Doorloop bij homen",
+              "reverse_delay": "Pauze bij richtingwissel",
+              "home_after_moves": "Homen na zoveel bewegingen",
+              "home_at_night": "Homen bij de nachtstand",
+              "home_end": "Homen tegen"
+            },
+            "data_description": {
+              "open_switch": "Schakelaar waarmee de actuator uitschuift (Zigbee2MQTT: switch.<naam>_l1). De actuator moet eigen eindschakelaars hebben.",
+              "close_switch": "Schakelaar waarmee hij intrekt (switch.<naam>_l2). Nooit allebei aan: Helios zet eerst de andere uit.",
+              "open_countdown": "Optioneel, bijv. number.<naam>_countdown_l1. Wordt bij elke beweging gezet als hardwarebeveiliging: het relais schakelt zelf uit, ook als Home Assistant stopt.",
+              "close_countdown": "Optioneel, bijv. number.<naam>_countdown_l2.",
+              "open_time": "Seconden van volledig dicht naar volledig open. Meet het via Opnieuw configureren > Looptijd meten.",
+              "close_time": "Seconden van volledig open naar volledig dicht (vaak anders).",
+              "angle_closed": "Meet de hoek van het paneel (of raam) aan beide uiteinden; de slag wordt daartussen lineair omgerekend, of gebruik een kalibratietabel met hoek:slag%-paren.",
+              "start_delay": "Seconden die de motor nodig heeft voor hij beweegt. Meestal 0.",
+              "home_overrun": "Bewegingen naar een eindstop lopen zoveel % van de looptijd langer door, zodat de schatting weer klopt.",
+              "reverse_delay": "Pauze na een beweging voordat de andere kant op wordt gestuurd.",
+              "home_after_moves": "Bij elke beweging groeit de afwijking; na zoveel bewegingen opnieuw homen (0 = alleen als het nodig is).",
+              "home_at_night": "Voor de nachtstand eerst tegen de home-eindstop rijden."
+            }
+          },
           "mapping_feedback": {
             "name": "Actuator-omrekening en terugkoppeling",
             "data": {
@@ -53,7 +88,7 @@
             },
             "data_description": {
               "position_at_min": "Wissel de twee posities om de actuator om te keren.",
-              "calibration": "hoek:positie paren, bijv. 0:0, 15:22, 30:47, 45:75, 60:100",
+              "calibration": "hoek:positie paren, bijv. 0:0, 15:22, 30:47, 45:75, 60:100. Twee relais: hoek:slag% (0 = volledig dicht).",
               "feedback_entity": "Optioneel. Zonder sensor wordt de coverpositie gebruikt, of een schatting op basis van de looptijd.",
               "travel_time": "Seconden van minimum naar maximum. Voor schattingen en de vastloopcontrole."
             }
@@ -113,7 +148,15 @@
       "invalid_mapping": "De omrekening is onbruikbaar. Tabel: minstens twee hoek:positie paren, posities stijgend (of dalend) met de hoek. Lineair: de twee posities moeten verschillen.",
       "actuator_in_use": "Deze actuator stuurt al een ander paneel aan.",
       "resume_above_stow": "De hervatsnelheid moet onder de veilige-standsnelheid liggen.",
-      "storm_below_stow": "De stormsnelheid moet minstens de veilige-standsnelheid zijn."
+      "storm_below_stow": "De stormsnelheid moet minstens de veilige-standsnelheid zijn.",
+      "actuator_required": "Kies de actuator-entiteit, of kies het type twee relais.",
+      "relays_required": "Kies zowel het open- als het dicht-relais (in de sectie Twee relais).",
+      "same_relay": "Het open- en dicht-relais moeten verschillende schakelaars zijn.",
+      "same_countdown": "De twee afteltijden moeten verschillende entiteiten zijn.",
+      "same_end_angles": "De hoeken bij volledig dicht en volledig open moeten verschillen.",
+      "limits_outside_stroke": "De minimale en maximale hoek moeten tussen de hoeken bij volledig dicht en volledig open liggen.",
+      "still_homing": "Nog aan het sluiten. Wacht tot hij helemaal dicht is en begint te openen, en bevestig als hij het open eind bereikt.",
+      "calibration_failed": "De kalibratie is gestopt (een relais reageerde niet, of het duurde te lang). Beide relais zijn uit."
     },
     "abort": {
       "already_configured": "Deze locatie is al ingesteld.",
@@ -137,18 +180,53 @@
             "min_angle": "Minimale hoek",
             "max_angle": "Maximale hoek",
             "step": "Stap",
-            "strategy": "Strategie"
+            "strategy": "Strategie",
+            "actuator_type": "Type actuator"
           },
           "data_description": {
-            "actuator_entity": "Een cover (set_cover_position), een number / input_number of een script (krijgt angle, position en panel als variabelen).",
+            "actuator_entity": "Een cover (set_cover_position), een number / input_number of een script (krijgt angle, position en panel als variabelen). Alleen voor het type entiteit.",
             "axis": "Kantelen: het paneel helt naar de azimut (0 = plat). Rollen: een eenassige tracker; negatieve hoeken kantelen de andere kant op.",
             "azimuth": "Kantelen: de richting waarin het paneel kijkt (180 = zuid). Rollen: de richting van positieve kanteling (as + 90).",
             "min_angle": "Zachte grens, er wordt nooit lager gestuurd.",
             "max_angle": "Zachte grens, er wordt nooit hoger gestuurd.",
             "step": "Doelhoeken worden op deze stap afgerond (0 = niet afronden).",
-            "strategy": "Hoe de hoek in automatische modus wordt gekozen."
+            "strategy": "Hoe de hoek in automatische modus wordt gekozen.",
+            "actuator_type": "Een bestaande entiteit (cover, number of script), of twee relais (open + dicht) die een domme actuator op tijd aansturen."
           },
           "sections": {
+            "relays": {
+              "name": "Twee relais (op tijd)",
+              "data": {
+                "open_switch": "Open-relais (uitschuiven)",
+                "close_switch": "Dicht-relais (intrekken)",
+                "open_countdown": "Afteltijd open-relais",
+                "close_countdown": "Afteltijd dicht-relais",
+                "open_time": "Looptijd volledig open",
+                "close_time": "Looptijd volledig dicht",
+                "angle_closed": "Paneelhoek volledig dicht",
+                "angle_open": "Paneelhoek volledig open",
+                "start_delay": "Startvertraging",
+                "home_overrun": "Doorloop bij homen",
+                "reverse_delay": "Pauze bij richtingwissel",
+                "home_after_moves": "Homen na zoveel bewegingen",
+                "home_at_night": "Homen bij de nachtstand",
+                "home_end": "Homen tegen"
+              },
+              "data_description": {
+                "open_switch": "Schakelaar waarmee de actuator uitschuift (Zigbee2MQTT: switch.<naam>_l1). De actuator moet eigen eindschakelaars hebben.",
+                "close_switch": "Schakelaar waarmee hij intrekt (switch.<naam>_l2). Nooit allebei aan: Helios zet eerst de andere uit.",
+                "open_countdown": "Optioneel, bijv. number.<naam>_countdown_l1. Wordt bij elke beweging gezet als hardwarebeveiliging: het relais schakelt zelf uit, ook als Home Assistant stopt.",
+                "close_countdown": "Optioneel, bijv. number.<naam>_countdown_l2.",
+                "open_time": "Seconden van volledig dicht naar volledig open. Meet het via Opnieuw configureren > Looptijd meten.",
+                "close_time": "Seconden van volledig open naar volledig dicht (vaak anders).",
+                "angle_closed": "Meet de hoek van het paneel (of raam) aan beide uiteinden; de slag wordt daartussen lineair omgerekend, of gebruik een kalibratietabel met hoek:slag%-paren.",
+                "start_delay": "Seconden die de motor nodig heeft voor hij beweegt. Meestal 0.",
+                "home_overrun": "Bewegingen naar een eindstop lopen zoveel % van de looptijd langer door, zodat de schatting weer klopt.",
+                "reverse_delay": "Pauze na een beweging voordat de andere kant op wordt gestuurd.",
+                "home_after_moves": "Bij elke beweging groeit de afwijking; na zoveel bewegingen opnieuw homen (0 = alleen als het nodig is).",
+                "home_at_night": "Voor de nachtstand eerst tegen de home-eindstop rijden."
+              }
+            },
             "mapping_feedback": {
               "name": "Actuator-omrekening en terugkoppeling",
               "data": {
@@ -162,7 +240,7 @@
               },
               "data_description": {
                 "position_at_min": "Wissel de twee posities om de actuator om te keren.",
-                "calibration": "hoek:positie paren, bijv. 0:0, 15:22, 30:47, 45:75, 60:100",
+                "calibration": "hoek:positie paren, bijv. 0:0, 15:22, 30:47, 45:75, 60:100. Twee relais: hoek:slag% (0 = volledig dicht).",
                 "feedback_entity": "Optioneel. Zonder sensor wordt de coverpositie gebruikt, of een schatting op basis van de looptijd.",
                 "travel_time": "Seconden van minimum naar maximum. Voor schattingen en de vastloopcontrole."
               }
@@ -199,6 +277,13 @@
         },
         "reconfigure": {
           "title": "Paneel wijzigen",
+          "menu_options": {
+            "settings": "Instellingen",
+            "travel": "Looptijd meten (kalibreren)"
+          }
+        },
+        "settings": {
+          "title": "Paneel wijzigen",
           "data": {
             "name": "Paneelnaam",
             "actuator_entity": "Actuator",
@@ -207,18 +292,53 @@
             "min_angle": "Minimale hoek",
             "max_angle": "Maximale hoek",
             "step": "Stap",
-            "strategy": "Strategie"
+            "strategy": "Strategie",
+            "actuator_type": "Type actuator"
           },
           "data_description": {
-            "actuator_entity": "Een cover (set_cover_position), een number / input_number of een script (krijgt angle, position en panel als variabelen).",
+            "actuator_entity": "Een cover (set_cover_position), een number / input_number of een script (krijgt angle, position en panel als variabelen). Alleen voor het type entiteit.",
             "axis": "Kantelen: het paneel helt naar de azimut (0 = plat). Rollen: een eenassige tracker; negatieve hoeken kantelen de andere kant op.",
             "azimuth": "Kantelen: de richting waarin het paneel kijkt (180 = zuid). Rollen: de richting van positieve kanteling (as + 90).",
             "min_angle": "Zachte grens, er wordt nooit lager gestuurd.",
             "max_angle": "Zachte grens, er wordt nooit hoger gestuurd.",
             "step": "Doelhoeken worden op deze stap afgerond (0 = niet afronden).",
-            "strategy": "Hoe de hoek in automatische modus wordt gekozen."
+            "strategy": "Hoe de hoek in automatische modus wordt gekozen.",
+            "actuator_type": "Een bestaande entiteit (cover, number of script), of twee relais (open + dicht) die een domme actuator op tijd aansturen."
           },
           "sections": {
+            "relays": {
+              "name": "Twee relais (op tijd)",
+              "data": {
+                "open_switch": "Open-relais (uitschuiven)",
+                "close_switch": "Dicht-relais (intrekken)",
+                "open_countdown": "Afteltijd open-relais",
+                "close_countdown": "Afteltijd dicht-relais",
+                "open_time": "Looptijd volledig open",
+                "close_time": "Looptijd volledig dicht",
+                "angle_closed": "Paneelhoek volledig dicht",
+                "angle_open": "Paneelhoek volledig open",
+                "start_delay": "Startvertraging",
+                "home_overrun": "Doorloop bij homen",
+                "reverse_delay": "Pauze bij richtingwissel",
+                "home_after_moves": "Homen na zoveel bewegingen",
+                "home_at_night": "Homen bij de nachtstand",
+                "home_end": "Homen tegen"
+              },
+              "data_description": {
+                "open_switch": "Schakelaar waarmee de actuator uitschuift (Zigbee2MQTT: switch.<naam>_l1). De actuator moet eigen eindschakelaars hebben.",
+                "close_switch": "Schakelaar waarmee hij intrekt (switch.<naam>_l2). Nooit allebei aan: Helios zet eerst de andere uit.",
+                "open_countdown": "Optioneel, bijv. number.<naam>_countdown_l1. Wordt bij elke beweging gezet als hardwarebeveiliging: het relais schakelt zelf uit, ook als Home Assistant stopt.",
+                "close_countdown": "Optioneel, bijv. number.<naam>_countdown_l2.",
+                "open_time": "Seconden van volledig dicht naar volledig open. Meet het via Opnieuw configureren > Looptijd meten.",
+                "close_time": "Seconden van volledig open naar volledig dicht (vaak anders).",
+                "angle_closed": "Meet de hoek van het paneel (of raam) aan beide uiteinden; de slag wordt daartussen lineair omgerekend, of gebruik een kalibratietabel met hoek:slag%-paren.",
+                "start_delay": "Seconden die de motor nodig heeft voor hij beweegt. Meestal 0.",
+                "home_overrun": "Bewegingen naar een eindstop lopen zoveel % van de looptijd langer door, zodat de schatting weer klopt.",
+                "reverse_delay": "Pauze na een beweging voordat de andere kant op wordt gestuurd.",
+                "home_after_moves": "Bij elke beweging groeit de afwijking; na zoveel bewegingen opnieuw homen (0 = alleen als het nodig is).",
+                "home_at_night": "Voor de nachtstand eerst tegen de home-eindstop rijden."
+              }
+            },
             "mapping_feedback": {
               "name": "Actuator-omrekening en terugkoppeling",
               "data": {
@@ -232,7 +352,7 @@
               },
               "data_description": {
                 "position_at_min": "Wissel de twee posities om de actuator om te keren.",
-                "calibration": "hoek:positie paren, bijv. 0:0, 15:22, 30:47, 45:75, 60:100",
+                "calibration": "hoek:positie paren, bijv. 0:0, 15:22, 30:47, 45:75, 60:100. Twee relais: hoek:slag% (0 = volledig dicht).",
                 "feedback_entity": "Optioneel. Zonder sensor wordt de coverpositie gebruikt, of een schatting op basis van de looptijd.",
                 "travel_time": "Seconden van minimum naar maximum. Voor schattingen en de vastloopcontrole."
               }
@@ -266,6 +386,34 @@
               }
             }
           }
+        },
+        "travel": {
+          "title": "Looptijd meten: {panel}",
+          "description": "Houd de actuator in het zicht en blijf er uit de buurt. Na bevestigen sluit hij eerst volledig (homen) gedurende de tijd hieronder, daarna begint hij te openen. Bevestig op het volgende scherm zodra hij het volledig open eind bereikt.",
+          "data": {
+            "homing_seconds": "Home-tijd"
+          },
+          "data_description": {
+            "homing_seconds": "Lang genoeg om vanaf elke stand helemaal te sluiten, plus marge."
+          }
+        },
+        "travel_open": {
+          "title": "Openen...",
+          "description": "Eerst sluit hij, dan opent hij. Bevestig zodra hij stopt op het volledig open eind."
+        },
+        "travel_close": {
+          "title": "Sluiten...",
+          "description": "Nu sluit hij. Bevestig zodra hij stopt op het volledig dichte eind."
+        },
+        "travel_result": {
+          "title": "Gemeten looptijd",
+          "description": "Controleer de gemeten tijden en vul de paneelhoek aan beide uiteinden in.",
+          "data": {
+            "open_time": "Looptijd volledig open",
+            "close_time": "Looptijd volledig dicht",
+            "angle_closed": "Paneelhoek volledig dicht",
+            "angle_open": "Paneelhoek volledig open"
+          }
         }
       },
       "error": {
@@ -276,10 +424,20 @@
         "invalid_mapping": "De omrekening is onbruikbaar. Tabel: minstens twee hoek:positie paren, posities stijgend (of dalend) met de hoek. Lineair: de twee posities moeten verschillen.",
         "actuator_in_use": "Deze actuator stuurt al een ander paneel aan.",
         "resume_above_stow": "De hervatsnelheid moet onder de veilige-standsnelheid liggen.",
-        "storm_below_stow": "De stormsnelheid moet minstens de veilige-standsnelheid zijn."
+        "storm_below_stow": "De stormsnelheid moet minstens de veilige-standsnelheid zijn.",
+        "actuator_required": "Kies de actuator-entiteit, of kies het type twee relais.",
+        "relays_required": "Kies zowel het open- als het dicht-relais (in de sectie Twee relais).",
+        "same_relay": "Het open- en dicht-relais moeten verschillende schakelaars zijn.",
+        "same_countdown": "De twee afteltijden moeten verschillende entiteiten zijn.",
+        "same_end_angles": "De hoeken bij volledig dicht en volledig open moeten verschillen.",
+        "limits_outside_stroke": "De minimale en maximale hoek moeten tussen de hoeken bij volledig dicht en volledig open liggen.",
+        "still_homing": "Nog aan het sluiten. Wacht tot hij helemaal dicht is en begint te openen, en bevestig als hij het open eind bereikt.",
+        "calibration_failed": "De kalibratie is gestopt (een relais reageerde niet, of het duurde te lang). Beide relais zijn uit."
       },
       "abort": {
-        "reconfigure_successful": "Opgeslagen."
+        "reconfigure_successful": "Opgeslagen.",
+        "not_loaded": "Laad eerst de integratie.",
+        "calibration_failed": "De kalibratie is gestopt (een relais reageerde niet, of het duurde te lang). Beide relais zijn uit."
       }
     }
   },
@@ -323,7 +481,15 @@
       "invalid_mapping": "De omrekening is onbruikbaar. Tabel: minstens twee hoek:positie paren, posities stijgend (of dalend) met de hoek. Lineair: de twee posities moeten verschillen.",
       "actuator_in_use": "Deze actuator stuurt al een ander paneel aan.",
       "resume_above_stow": "De hervatsnelheid moet onder de veilige-standsnelheid liggen.",
-      "storm_below_stow": "De stormsnelheid moet minstens de veilige-standsnelheid zijn."
+      "storm_below_stow": "De stormsnelheid moet minstens de veilige-standsnelheid zijn.",
+      "actuator_required": "Kies de actuator-entiteit, of kies het type twee relais.",
+      "relays_required": "Kies zowel het open- als het dicht-relais (in de sectie Twee relais).",
+      "same_relay": "Het open- en dicht-relais moeten verschillende schakelaars zijn.",
+      "same_countdown": "De twee afteltijden moeten verschillende entiteiten zijn.",
+      "same_end_angles": "De hoeken bij volledig dicht en volledig open moeten verschillen.",
+      "limits_outside_stroke": "De minimale en maximale hoek moeten tussen de hoeken bij volledig dicht en volledig open liggen.",
+      "still_homing": "Nog aan het sluiten. Wacht tot hij helemaal dicht is en begint te openen, en bevestig als hij het open eind bereikt.",
+      "calibration_failed": "De kalibratie is gestopt (een relais reageerde niet, of het duurde te lang). Beide relais zijn uit."
     }
   },
   "entity": {
@@ -389,6 +555,23 @@
       },
       "wind_stow": {
         "name": "Wind: veilige stand"
+      },
+      "position_uncertain": {
+        "name": "Positie onzeker"
+      }
+    },
+    "button": {
+      "home": {
+        "name": "Nu homen"
+      },
+      "travel_start": {
+        "name": "Looptijd meten: start"
+      },
+      "travel_mark": {
+        "name": "Looptijd meten: eind bereikt"
+      },
+      "travel_cancel": {
+        "name": "Looptijd meten: annuleren"
       }
     }
   },
@@ -427,6 +610,26 @@
         "seasonal": "Seizoenscurve",
         "daily": "Dagoptimum",
         "tracking": "Zon volgen"
+      }
+    },
+    "actuator_type": {
+      "options": {
+        "entity": "Entiteit (cover, number of script)",
+        "relays": "Twee relais (op tijd)"
+      }
+    },
+    "home_end": {
+      "options": {
+        "closed": "Volledig dicht",
+        "open": "Volledig open",
+        "nearest": "Dichtstbijzijnde eind"
+      }
+    },
+    "travel_action": {
+      "options": {
+        "start": "Start (helemaal dicht, dan open)",
+        "stop": "Eind bereikt",
+        "cancel": "Annuleren"
       }
     }
   },
@@ -474,6 +677,24 @@
           "description": "De gemeten paneelhoek."
         }
       }
+    },
+    "home": {
+      "name": "Nu homen",
+      "description": "Panelen op twee relais: rij tegen de home-eindstop om de schatting gelijk te zetten, dan terug naar het doel."
+    },
+    "calibrate_travel": {
+      "name": "Looptijd meten",
+      "description": "Panelen op twee relais: start sluit volledig en opent dan; roep stop aan bij het open eind, en nog eens bij het dichte eind. De tijden worden opgeslagen.",
+      "fields": {
+        "action": {
+          "name": "Actie",
+          "description": "start, stop (eind bereikt) of cancel."
+        },
+        "homing_seconds": {
+          "name": "Home-tijd",
+          "description": "Hoe lang eerst te sluiten. Standaard: de maximale looptijd."
+        }
+      }
     }
   },
   "exceptions": {
@@ -485,12 +706,19 @@
     },
     "not_a_panel": {
       "message": "{target} is geen Helios Tilt-paneel."
+    },
+    "not_relays": {
+      "message": "Kies een paneel dat met twee relais wordt aangestuurd."
     }
   },
   "issues": {
     "actuator_stuck": {
       "title": "{panel}: actuator bereikte de hoek niet",
       "description": "{entity} moest naar {target}° maar meldt {current}°. Controleer de actuator, de voeding en de eindstops. De melding verdwijnt vanzelf zodra het paneel zijn doel bereikt."
+    },
+    "relay_fault": {
+      "title": "{panel}: probleem met een relais",
+      "description": "{fault}. Beide relais zijn uitgeschakeld en de positie is als onzeker gemarkeerd; de volgende beweging homet eerst. Controleer het relaisapparaat, de Zigbee-verbinding en de bedrading. De melding verdwijnt na de volgende geslaagde beweging."
     }
   }
 }

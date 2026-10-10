@@ -31,6 +31,21 @@ POSITIONS = {
 }
 
 
+RELAYS = {
+    "open_time": 30,
+    "close_time": 30,
+    "angle_closed": 0,
+    "angle_open": 60,
+    "start_delay": 0,
+    "home_overrun": 15,
+    "reverse_delay": 1,
+    "home_after_moves": 20,
+    "home_at_night": True,
+    "home_end": "closed",
+}
+RELAY_ENTITIES = ("open_switch", "close_switch", "open_countdown", "close_countdown")
+
+
 def panel_input(**overrides) -> dict:
     data = {
         CONF_NAME: "Garden",
@@ -41,6 +56,7 @@ def panel_input(**overrides) -> dict:
         "max_angle": 60,
         "step": 5,
         "strategy": "daily",
+        "relays": {**RELAYS},
         "mapping_feedback": {**MAPPING},
         "positions": {**POSITIONS},
         "pv": {"pv_peak_power": 0},
@@ -48,6 +64,8 @@ def panel_input(**overrides) -> dict:
     for key, value in overrides.items():
         if key in MAPPING or key in ("calibration", "feedback_entity"):
             data["mapping_feedback"][key] = value
+        elif key in RELAYS or key in RELAY_ENTITIES:
+            data["relays"][key] = value
         else:
             data[key] = value
     return data
@@ -158,7 +176,7 @@ async def test_add_and_reconfigure_panel(
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"], panel_input()
     )
-    assert result["errors"] == {"actuator_entity": "actuator_in_use"}
+    assert result["errors"] == {"base": "actuator_in_use"}
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"], panel_input(**{CONF_NAME: "Shed", "actuator_entity": cover2})
     )
@@ -169,7 +187,7 @@ async def test_add_and_reconfigure_panel(
 
     sub = next(s for s in entry.subentries.values() if s.title == "Shed")
     result = await entry.start_subentry_reconfigure_flow(hass, sub.subentry_id)
-    assert result["step_id"] == "reconfigure"
+    assert result["step_id"] == "settings"  # no menu for an entity actuator
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
         panel_input(

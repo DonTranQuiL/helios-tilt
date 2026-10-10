@@ -28,18 +28,53 @@
           "min_angle": "Minimum angle",
           "max_angle": "Maximum angle",
           "step": "Step",
-          "strategy": "Strategy"
+          "strategy": "Strategy",
+          "actuator_type": "Actuator type"
         },
         "data_description": {
-          "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables).",
+          "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables). Only for the entity type.",
           "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
           "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
           "min_angle": "Soft limit, never commanded below this.",
           "max_angle": "Soft limit, never commanded above this.",
           "step": "Targets are rounded to this step (0 = no rounding).",
-          "strategy": "How the angle is chosen in automatic mode."
+          "strategy": "How the angle is chosen in automatic mode.",
+          "actuator_type": "An existing entity (cover, number or script), or two relays (open + close) driving a dumb actuator by time."
         },
         "sections": {
+          "relays": {
+            "name": "Two relays (timed)",
+            "data": {
+              "open_switch": "Open relay (extends)",
+              "close_switch": "Close relay (retracts)",
+              "open_countdown": "Open relay countdown",
+              "close_countdown": "Close relay countdown",
+              "open_time": "Full open time",
+              "close_time": "Full close time",
+              "angle_closed": "Panel angle when fully closed",
+              "angle_open": "Panel angle when fully open",
+              "start_delay": "Start delay",
+              "home_overrun": "Homing overrun",
+              "reverse_delay": "Direction change pause",
+              "home_after_moves": "Home after this many moves",
+              "home_at_night": "Home at the night park",
+              "home_end": "Home against"
+            },
+            "data_description": {
+              "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.<name>_l1). The actuator must have its own limit switches.",
+              "close_switch": "Switch that makes it retract (switch.<name>_l2). Never both on: Helios switches the other one off first.",
+              "open_countdown": "Optional, e.g. number.<name>_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
+              "close_countdown": "Optional, e.g. number.<name>_countdown_l2.",
+              "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
+              "close_time": "Seconds from fully open to fully closed (often different).",
+              "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
+              "start_delay": "Seconds the motor needs before it moves. Usually 0.",
+              "home_overrun": "Runs to an end stop keep going this % of the travel time longer, so the estimate re-syncs.",
+              "reverse_delay": "Pause after a run before going the other way.",
+              "home_after_moves": "Drift builds up with every move; home again after this many moves (0 = only when needed).",
+              "home_at_night": "Drive into the home end stop before the night park."
+            }
+          },
           "mapping_feedback": {
             "name": "Actuator mapping and feedback",
             "data": {
@@ -53,7 +88,7 @@
             },
             "data_description": {
               "position_at_min": "Swap the two positions to invert the actuator.",
-              "calibration": "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100",
+              "calibration": "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100. Two relays: angle:stroke% (0 = fully closed).",
               "feedback_entity": "Optional. Without it the cover position is used, or an estimate from the travel time.",
               "travel_time": "Seconds from minimum to maximum. Used for estimates and the stuck check."
             }
@@ -113,7 +148,15 @@
       "invalid_mapping": "The mapping can't be used. Table: at least two angle:position pairs, positions rising (or falling) with the angle. Linear: the two positions must differ.",
       "actuator_in_use": "This actuator already drives another panel.",
       "resume_above_stow": "The resume speed must be below the stow speed.",
-      "storm_below_stow": "The storm speed must be at least the stow speed."
+      "storm_below_stow": "The storm speed must be at least the stow speed.",
+      "actuator_required": "Choose the actuator entity, or pick the two relays type.",
+      "relays_required": "Choose both the open and the close relay (in the Two relays section).",
+      "same_relay": "The open and close relay must be different switches.",
+      "same_countdown": "The two countdowns must be different entities.",
+      "same_end_angles": "The angles at fully closed and fully open must differ.",
+      "limits_outside_stroke": "The minimum and maximum angle must lie between the angles at fully closed and fully open.",
+      "still_homing": "Still closing. Wait until it has closed fully and starts to open, then submit when it reaches the open end.",
+      "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off."
     },
     "abort": {
       "already_configured": "This site is already set up.",
@@ -137,18 +180,53 @@
             "min_angle": "Minimum angle",
             "max_angle": "Maximum angle",
             "step": "Step",
-            "strategy": "Strategy"
+            "strategy": "Strategy",
+            "actuator_type": "Actuator type"
           },
           "data_description": {
-            "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables).",
+            "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables). Only for the entity type.",
             "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
             "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
             "min_angle": "Soft limit, never commanded below this.",
             "max_angle": "Soft limit, never commanded above this.",
             "step": "Targets are rounded to this step (0 = no rounding).",
-            "strategy": "How the angle is chosen in automatic mode."
+            "strategy": "How the angle is chosen in automatic mode.",
+            "actuator_type": "An existing entity (cover, number or script), or two relays (open + close) driving a dumb actuator by time."
           },
           "sections": {
+            "relays": {
+              "name": "Two relays (timed)",
+              "data": {
+                "open_switch": "Open relay (extends)",
+                "close_switch": "Close relay (retracts)",
+                "open_countdown": "Open relay countdown",
+                "close_countdown": "Close relay countdown",
+                "open_time": "Full open time",
+                "close_time": "Full close time",
+                "angle_closed": "Panel angle when fully closed",
+                "angle_open": "Panel angle when fully open",
+                "start_delay": "Start delay",
+                "home_overrun": "Homing overrun",
+                "reverse_delay": "Direction change pause",
+                "home_after_moves": "Home after this many moves",
+                "home_at_night": "Home at the night park",
+                "home_end": "Home against"
+              },
+              "data_description": {
+                "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.<name>_l1). The actuator must have its own limit switches.",
+                "close_switch": "Switch that makes it retract (switch.<name>_l2). Never both on: Helios switches the other one off first.",
+                "open_countdown": "Optional, e.g. number.<name>_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
+                "close_countdown": "Optional, e.g. number.<name>_countdown_l2.",
+                "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
+                "close_time": "Seconds from fully open to fully closed (often different).",
+                "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
+                "start_delay": "Seconds the motor needs before it moves. Usually 0.",
+                "home_overrun": "Runs to an end stop keep going this % of the travel time longer, so the estimate re-syncs.",
+                "reverse_delay": "Pause after a run before going the other way.",
+                "home_after_moves": "Drift builds up with every move; home again after this many moves (0 = only when needed).",
+                "home_at_night": "Drive into the home end stop before the night park."
+              }
+            },
             "mapping_feedback": {
               "name": "Actuator mapping and feedback",
               "data": {
@@ -162,7 +240,7 @@
               },
               "data_description": {
                 "position_at_min": "Swap the two positions to invert the actuator.",
-                "calibration": "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100",
+                "calibration": "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100. Two relays: angle:stroke% (0 = fully closed).",
                 "feedback_entity": "Optional. Without it the cover position is used, or an estimate from the travel time.",
                 "travel_time": "Seconds from minimum to maximum. Used for estimates and the stuck check."
               }
@@ -199,6 +277,13 @@
         },
         "reconfigure": {
           "title": "Change panel",
+          "menu_options": {
+            "settings": "Settings",
+            "travel": "Time the travel (calibrate)"
+          }
+        },
+        "settings": {
+          "title": "Change panel",
           "data": {
             "name": "Panel name",
             "actuator_entity": "Actuator",
@@ -207,18 +292,53 @@
             "min_angle": "Minimum angle",
             "max_angle": "Maximum angle",
             "step": "Step",
-            "strategy": "Strategy"
+            "strategy": "Strategy",
+            "actuator_type": "Actuator type"
           },
           "data_description": {
-            "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables).",
+            "actuator_entity": "A cover (set_cover_position), a number / input_number, or a script (gets angle, position and panel as variables). Only for the entity type.",
             "axis": "Tilt: the panel leans toward the azimuth (0 = flat). Roll: a single-axis tracker; negative angles tilt the other way.",
             "azimuth": "Tilt: the direction the panel faces (180 = south). Roll: the direction of positive tilt (axis + 90).",
             "min_angle": "Soft limit, never commanded below this.",
             "max_angle": "Soft limit, never commanded above this.",
             "step": "Targets are rounded to this step (0 = no rounding).",
-            "strategy": "How the angle is chosen in automatic mode."
+            "strategy": "How the angle is chosen in automatic mode.",
+            "actuator_type": "An existing entity (cover, number or script), or two relays (open + close) driving a dumb actuator by time."
           },
           "sections": {
+            "relays": {
+              "name": "Two relays (timed)",
+              "data": {
+                "open_switch": "Open relay (extends)",
+                "close_switch": "Close relay (retracts)",
+                "open_countdown": "Open relay countdown",
+                "close_countdown": "Close relay countdown",
+                "open_time": "Full open time",
+                "close_time": "Full close time",
+                "angle_closed": "Panel angle when fully closed",
+                "angle_open": "Panel angle when fully open",
+                "start_delay": "Start delay",
+                "home_overrun": "Homing overrun",
+                "reverse_delay": "Direction change pause",
+                "home_after_moves": "Home after this many moves",
+                "home_at_night": "Home at the night park",
+                "home_end": "Home against"
+              },
+              "data_description": {
+                "open_switch": "Switch that makes the actuator extend (Zigbee2MQTT: switch.<name>_l1). The actuator must have its own limit switches.",
+                "close_switch": "Switch that makes it retract (switch.<name>_l2). Never both on: Helios switches the other one off first.",
+                "open_countdown": "Optional, e.g. number.<name>_countdown_l1. Set for every run as a hardware fail-safe: the relay switches itself off even if Home Assistant stops.",
+                "close_countdown": "Optional, e.g. number.<name>_countdown_l2.",
+                "open_time": "Seconds from fully closed to fully open. Measure it with Reconfigure > Time the travel.",
+                "close_time": "Seconds from fully open to fully closed (often different).",
+                "angle_closed": "Measure the panel (or window) angle at both ends; the stroke is mapped linearly in between, or use a calibration table of angle:stroke% pairs.",
+                "start_delay": "Seconds the motor needs before it moves. Usually 0.",
+                "home_overrun": "Runs to an end stop keep going this % of the travel time longer, so the estimate re-syncs.",
+                "reverse_delay": "Pause after a run before going the other way.",
+                "home_after_moves": "Drift builds up with every move; home again after this many moves (0 = only when needed).",
+                "home_at_night": "Drive into the home end stop before the night park."
+              }
+            },
             "mapping_feedback": {
               "name": "Actuator mapping and feedback",
               "data": {
@@ -232,7 +352,7 @@
               },
               "data_description": {
                 "position_at_min": "Swap the two positions to invert the actuator.",
-                "calibration": "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100",
+                "calibration": "angle:position pairs, e.g. 0:0, 15:22, 30:47, 45:75, 60:100. Two relays: angle:stroke% (0 = fully closed).",
                 "feedback_entity": "Optional. Without it the cover position is used, or an estimate from the travel time.",
                 "travel_time": "Seconds from minimum to maximum. Used for estimates and the stuck check."
               }
@@ -266,6 +386,34 @@
               }
             }
           }
+        },
+        "travel": {
+          "title": "Time the travel: {panel}",
+          "description": "Keep the actuator in sight and stay clear of it. On submit it first closes fully (homing) for the time below, then starts opening. On the next screen, submit the moment it reaches the fully open end.",
+          "data": {
+            "homing_seconds": "Homing time"
+          },
+          "data_description": {
+            "homing_seconds": "Long enough to close fully from anywhere, plus a margin."
+          }
+        },
+        "travel_open": {
+          "title": "Opening...",
+          "description": "It closes first, then opens. Submit the moment it stops at the fully open end."
+        },
+        "travel_close": {
+          "title": "Closing...",
+          "description": "Now it closes. Submit the moment it stops at the fully closed end."
+        },
+        "travel_result": {
+          "title": "Measured travel",
+          "description": "Check the measured times and enter the panel angle at both ends.",
+          "data": {
+            "open_time": "Full open time",
+            "close_time": "Full close time",
+            "angle_closed": "Panel angle when fully closed",
+            "angle_open": "Panel angle when fully open"
+          }
         }
       },
       "error": {
@@ -276,10 +424,20 @@
         "invalid_mapping": "The mapping can't be used. Table: at least two angle:position pairs, positions rising (or falling) with the angle. Linear: the two positions must differ.",
         "actuator_in_use": "This actuator already drives another panel.",
         "resume_above_stow": "The resume speed must be below the stow speed.",
-        "storm_below_stow": "The storm speed must be at least the stow speed."
+        "storm_below_stow": "The storm speed must be at least the stow speed.",
+        "actuator_required": "Choose the actuator entity, or pick the two relays type.",
+        "relays_required": "Choose both the open and the close relay (in the Two relays section).",
+        "same_relay": "The open and close relay must be different switches.",
+        "same_countdown": "The two countdowns must be different entities.",
+        "same_end_angles": "The angles at fully closed and fully open must differ.",
+        "limits_outside_stroke": "The minimum and maximum angle must lie between the angles at fully closed and fully open.",
+        "still_homing": "Still closing. Wait until it has closed fully and starts to open, then submit when it reaches the open end.",
+        "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off."
       },
       "abort": {
-        "reconfigure_successful": "Saved."
+        "reconfigure_successful": "Saved.",
+        "not_loaded": "Load the integration first.",
+        "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off."
       }
     }
   },
@@ -323,7 +481,15 @@
       "invalid_mapping": "The mapping can't be used. Table: at least two angle:position pairs, positions rising (or falling) with the angle. Linear: the two positions must differ.",
       "actuator_in_use": "This actuator already drives another panel.",
       "resume_above_stow": "The resume speed must be below the stow speed.",
-      "storm_below_stow": "The storm speed must be at least the stow speed."
+      "storm_below_stow": "The storm speed must be at least the stow speed.",
+      "actuator_required": "Choose the actuator entity, or pick the two relays type.",
+      "relays_required": "Choose both the open and the close relay (in the Two relays section).",
+      "same_relay": "The open and close relay must be different switches.",
+      "same_countdown": "The two countdowns must be different entities.",
+      "same_end_angles": "The angles at fully closed and fully open must differ.",
+      "limits_outside_stroke": "The minimum and maximum angle must lie between the angles at fully closed and fully open.",
+      "still_homing": "Still closing. Wait until it has closed fully and starts to open, then submit when it reaches the open end.",
+      "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off."
     }
   },
   "entity": {
@@ -389,6 +555,23 @@
       },
       "wind_stow": {
         "name": "Wind stow"
+      },
+      "position_uncertain": {
+        "name": "Position uncertain"
+      }
+    },
+    "button": {
+      "home": {
+        "name": "Home now"
+      },
+      "travel_start": {
+        "name": "Travel calibration: start"
+      },
+      "travel_mark": {
+        "name": "Travel calibration: end reached"
+      },
+      "travel_cancel": {
+        "name": "Travel calibration: cancel"
       }
     }
   },
@@ -427,6 +610,26 @@
         "seasonal": "Seasonal curve",
         "daily": "Daily optimum",
         "tracking": "Sun tracking"
+      }
+    },
+    "actuator_type": {
+      "options": {
+        "entity": "Entity (cover, number or script)",
+        "relays": "Two relays (timed)"
+      }
+    },
+    "home_end": {
+      "options": {
+        "closed": "Fully closed",
+        "open": "Fully open",
+        "nearest": "Nearest end"
+      }
+    },
+    "travel_action": {
+      "options": {
+        "start": "Start (close fully, then open)",
+        "stop": "End reached",
+        "cancel": "Cancel"
       }
     }
   },
@@ -474,6 +677,24 @@
           "description": "The measured panel angle."
         }
       }
+    },
+    "home": {
+      "name": "Home now",
+      "description": "Panels on two relays: drive into the home end stop to re-sync the estimate, then back to the target."
+    },
+    "calibrate_travel": {
+      "name": "Time the travel",
+      "description": "Panels on two relays: start closes fully, then opens; call stop when it reaches the open end, and again at the closed end. The times are saved.",
+      "fields": {
+        "action": {
+          "name": "Action",
+          "description": "start, stop (end reached) or cancel."
+        },
+        "homing_seconds": {
+          "name": "Homing time",
+          "description": "How long to close first. Default: the maximum run time."
+        }
+      }
     }
   },
   "exceptions": {
@@ -485,12 +706,19 @@
     },
     "not_a_panel": {
       "message": "{target} is not a Helios Tilt panel."
+    },
+    "not_relays": {
+      "message": "Choose a panel driven by two relays."
     }
   },
   "issues": {
     "actuator_stuck": {
       "title": "{panel}: actuator did not reach its angle",
       "description": "{entity} was told to go to {target}° but reports {current}°. Check the actuator, its power and its end stops. The warning clears by itself once the panel reaches its target."
+    },
+    "relay_fault": {
+      "title": "{panel}: relay problem",
+      "description": "{fault}. Both relays were switched off and the position is marked uncertain; the next move homes first. Check the relay device, its Zigbee link and the wiring. This clears after the next successful move."
     }
   }
 }

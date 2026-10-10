@@ -7,10 +7,10 @@ from typing import Final
 
 DOMAIN: Final = "helios_tilt"
 NAME: Final = "Helios Tilt"
-VERSION = "0.1.0b2"
+VERSION = "0.1.0b3"
 LOGGER = logging.getLogger(__package__)
 
-PLATFORMS: Final = ["binary_sensor", "number", "select", "sensor", "switch"]
+PLATFORMS: Final = ["binary_sensor", "button", "number", "select", "sensor", "switch"]
 SUBENTRY_PANEL: Final = "panel"
 
 CARD_FILENAME: Final = "helios-tilt-card.js"
@@ -88,6 +88,30 @@ CONF_SEASON_WEIGHT: Final = "season_weight"
 CONF_PV_POWER: Final = "pv_power_entity"
 CONF_PV_PEAK: Final = "pv_peak_power"  # W
 
+# Two relays (timed): a dumb actuator on an open and a close relay.
+CONF_ACTUATOR_TYPE: Final = "actuator_type"
+ACTUATOR_ENTITY: Final = "entity"  # cover, number, input_number or script
+ACTUATOR_RELAYS: Final = "relays"
+ACTUATOR_TYPES: Final = [ACTUATOR_ENTITY, ACTUATOR_RELAYS]
+CONF_OPEN_SWITCH: Final = "open_switch"
+CONF_CLOSE_SWITCH: Final = "close_switch"
+CONF_OPEN_COUNTDOWN: Final = "open_countdown"
+CONF_CLOSE_COUNTDOWN: Final = "close_countdown"
+CONF_OPEN_TIME: Final = "open_time"  # s, fully closed -> fully open
+CONF_CLOSE_TIME: Final = "close_time"  # s, fully open -> fully closed
+CONF_ANGLE_CLOSED: Final = "angle_closed"  # panel angle with the actuator fully closed
+CONF_ANGLE_OPEN: Final = "angle_open"  # panel angle with the actuator fully open
+CONF_START_DELAY: Final = "start_delay"  # s before the motor really moves
+CONF_HOME_OVERRUN: Final = "home_overrun"  # % of the travel time past an end
+CONF_REVERSE_DELAY: Final = "reverse_delay"  # s pause before changing direction
+CONF_HOME_AFTER_MOVES: Final = "home_after_moves"
+CONF_HOME_AT_NIGHT: Final = "home_at_night"
+CONF_HOME_END: Final = "home_end"
+HOME_CLOSED: Final = "closed"
+HOME_OPEN: Final = "open"
+HOME_NEAREST: Final = "nearest"
+HOME_ENDS: Final = [HOME_CLOSED, HOME_OPEN, HOME_NEAREST]
+
 AXIS_TILT: Final = "tilt"  # tilts toward the azimuth, angle 0..90
 AXIS_ROLL: Final = "roll"  # single-axis tracker, angle -90..90
 AXES: Final = [AXIS_TILT, AXIS_ROLL]
@@ -135,6 +159,17 @@ PANEL_DEFAULTS: Final = {
     CONF_SUMMER_ANGLE: 20.0,
     CONF_SEASON_WEIGHT: 50.0,
     CONF_PV_PEAK: 0.0,
+    CONF_ACTUATOR_TYPE: ACTUATOR_ENTITY,
+    CONF_OPEN_TIME: 30.0,
+    CONF_CLOSE_TIME: 30.0,
+    CONF_ANGLE_CLOSED: 0.0,
+    CONF_ANGLE_OPEN: 60.0,
+    CONF_START_DELAY: 0.0,
+    CONF_HOME_OVERRUN: 15.0,
+    CONF_REVERSE_DELAY: 1.0,
+    CONF_HOME_AFTER_MOVES: 20,
+    CONF_HOME_AT_NIGHT: True,
+    CONF_HOME_END: HOME_CLOSED,
 }
 
 # Move reasons (also translation keys for the last-move sensor).

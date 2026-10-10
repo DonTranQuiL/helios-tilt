@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     ATTR_UNIT_OF_MEASUREMENT,
+    EVENT_HOMEASSISTANT_STOP,
     EVENT_LOGBOOK_ENTRY,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
@@ -31,6 +32,7 @@ from homeassistant.util.unit_conversion import SpeedConverter, TemperatureConver
 
 from .actuator import AngleMapping, estimate_angle, travel_seconds
 from .const import (
+    ACTUATOR_RELAYS,
     CONF_CALM_MINUTES,
     CONF_CLOUD_THRESHOLD,
     CONF_DEADBAND,
@@ -87,6 +89,7 @@ from .engine import (
     seasonal_angle,
     tracking_target,
 )
+from .relays import RelayConfig, RelayDriver
 from .safety import (
     FROST,
     RAIN,
@@ -104,6 +107,7 @@ COVER_MOVING = ("opening", "closing")
 MANUAL_TOLERANCE = 3.0  # degrees between expected and reported angle
 SETTLE_GRACE = timedelta(seconds=30)
 HISTORY_LEN = 10
+REFRESH_WHILE_MOVING = timedelta(seconds=2)
 REASON_TEXT = {
     REASON_STRATEGY: "{strategy}",
     REASON_NIGHT: "Night park",
@@ -181,6 +185,42 @@ class PanelConfig:
     season_weight: float = 50.0
     pv_power_entity: str | None = None
     pv_peak_power: float = 0.0
+    actuator_type: str = "entity"
+    open_switch: str = ""
+    close_switch: str = ""
+    open_countdown: str | None = None
+    close_countdown: str | None = None
+    open_time: float = 30.0
+    close_time: float = 30.0
+    angle_closed: float = 0.0
+    angle_open: float = 60.0
+    start_delay: float = 0.0
+    home_overrun: float = 15.0
+    reverse_delay: float = 1.0
+    home_after_moves: int = 20
+    home_at_night: bool = True
+    home_end: str = "closed"
+
+    @property
+    def relays(self) -> bool:
+        """Two relays (timed) instead of an entity."""
+        return self.actuator_type == ACTUATOR_RELAYS
+
+    def relay_config(self) -> RelayConfig:
+        """Settings for the relay driver."""
+        return RelayConfig(
+            open_switch=self.open_switch,
+            close_switch=self.close_switch,
+            open_countdown=self.open_countdown or None,
+            close_countdown=self.close_countdown or None,
+            open_time=self.open_time,
+            close_time=self.close_time,
+            start_delay=self.start_delay,
+            home_overrun=self.home_overrun,
+            reverse_delay=self.reverse_delay,
+            home_after_moves=int(self.home_after_moves),
+            home_end=self.home_end,
+        )
 
     @classmethod
     def from_data(cls, data: dict[str, Any]) -> PanelConfig:
@@ -197,9 +237,19 @@ class PanelConfig:
         return cls(**values)
 
     def build_mapping(self) -> AngleMapping:
-        """Angle <-> position mapping."""
+        """Angle <-> position mapping.
+
+        For two relays the position is the stroke in % (0 = fully closed,
+        100 = fully open), linear between the angles at both ends, or from a
+        table of angle:stroke% pairs.
+        """
         if self.mapping == MAPPING_TABLE:
             return AngleMapping.table(self.calibration)
+        if self.relays:
+            points = sorted([(self.angle_closed, 0.0), (self.angle_open, 100.0)])
+            return AngleMapping.linear(
+                points[0][0], points[1][0], points[0][1], points[1][1]
+            )
         return AngleMapping.linear(
             self.min_angle, self.max_angle, self.position_at_min, self.position_at_max
         )
@@ -272,6 +322,7 @@ class Panel:
     curve_key: tuple | None = None
     expected_position: float | None = None
     user_pending: bool = False  # a user change waits for the actuator to stop
+    driver: RelayDriver | None = None
 
     @property
     def strategy(self) -> str:
@@ -319,6 +370,7 @@ class Panel:
             "manual_until": self.manual_until.isoformat()
             if self.manual_until
             else None,
+            "relay": self.driver.store_data() if self.driver else None,
         }
 
     def restore(self, data: dict[str, Any]) -> None:
@@ -347,6 +399,8 @@ class Panel:
                 )
         if until := data.get("manual_until"):
             self.manual_until = dt_util.parse_datetime(until)
+        if self.driver is not None and (relay := data.get("relay")):
+            self.driver.restore(relay)
 
 
 class HeliosSite:
@@ -396,6 +450,7 @@ class HeliosSite:
         self._listeners: list[Callable[[], None]] = []
         self._unsubs: list[CALLBACK_TYPE] = []
         self._last_tick: datetime | None = None
+        self._refresh_unsub: CALLBACK_TYPE | None = None
         self._evaluating = False
         self._again = False
         self._store: Store[dict[str, Any]] = Store(
@@ -407,9 +462,20 @@ class HeliosSite:
         geometry = PanelGeometry(
             self.latitude, self.longitude, cfg.azimuth, cfg.min_angle, cfg.max_angle
         )
-        return Panel(
+        panel = Panel(
             subentry.subentry_id, subentry.title, cfg, cfg.build_mapping(), geometry
         )
+        if cfg.relays:
+            panel.driver = RelayDriver(
+                self.hass,
+                cfg.relay_config(),
+                subentry.title,
+                on_change=lambda: self._driver_changed(panel),
+                on_external=lambda direction: self._driver_external(panel, direction),
+                on_persist=self._save_now,
+                on_fault=lambda fault: self._driver_fault(panel, fault),
+            )
+        return panel
 
     # ---- lifecycle -----------------------------------------------------------
 
@@ -433,6 +499,8 @@ class HeliosSite:
             panel.fixed_angle = await self.hass.async_add_executor_job(
                 annual_optimum, panel.geometry, year, tz
             )
+            if panel.driver is not None:
+                await panel.driver.async_start()
         await self.async_evaluate()  # fill in targets; nothing moves yet
 
     @callback
@@ -461,16 +529,35 @@ class HeliosSite:
         )
         # Nothing moves before Home Assistant has fully started.
         self._unsubs.append(async_at_started(self.hass, self._async_on_started))
+        if any(p.driver for p in self.panels.values()):
+            self._unsubs.append(
+                self.hass.bus.async_listen_once(
+                    EVENT_HOMEASSISTANT_STOP, self._async_relays_off
+                )
+            )
+
+    async def _async_relays_off(self, _event: Event | None = None) -> None:
+        """Home Assistant stops: both relays of every panel off."""
+        for panel in self.panels.values():
+            if panel.driver is not None:
+                await panel.driver.async_shutdown()
+        await self._store.async_save(self._store_data())
 
     async def _async_on_started(self, _hass: HomeAssistant) -> None:
         self.started = True
         await self.async_evaluate()
 
     async def async_stop(self) -> None:
-        """Unsubscribe and save."""
+        """Unsubscribe, switch relays off and save."""
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
+        if self._refresh_unsub is not None:
+            self._refresh_unsub()
+            self._refresh_unsub = None
+        for panel in self.panels.values():
+            if panel.driver is not None:
+                await panel.driver.async_shutdown()
         await self._store.async_save(self._store_data())
 
     def _store_data(self) -> dict[str, Any]:
@@ -489,6 +576,150 @@ class HeliosSite:
     @callback
     def _save(self) -> None:
         self._store.async_delay_save(self._store_data, 5)
+
+    @callback
+    def _save_now(self) -> None:
+        """Save at once (a relay run starts or ends: survive a crash)."""
+        self.hass.async_create_task(
+            self._store.async_save(self._store_data()), eager_start=True
+        )
+
+    # ---- relay driver callbacks ---------------------------------------------------
+
+    @callback
+    def async_home(self, panel: Panel) -> None:
+        """Home now: into the end stop, then back to the current target."""
+        if panel.driver is None:
+            return
+        then = panel.target if panel.target is not None else panel.commanded
+        position = None if then is None else panel.mapping.to_position(then)
+        now = dt_util.utcnow()
+        panel.move_started = now
+        panel.commanded = then
+        panel.driver.async_home(position)
+        self._record(
+            panel,
+            now,
+            then if then is not None else 0.0,
+            REASON_CALIBRATE,
+            "homing against the end stop",
+        )
+
+    @callback
+    def async_travel_calibration(
+        self,
+        panel: Panel,
+        action: str,
+        homing_seconds: float | None = None,
+        autosave: bool = True,
+    ) -> dict[str, Any] | None:
+        """Start, mark (end reached) or cancel the travel-time calibration."""
+        driver = panel.driver
+        if driver is None:
+            return None
+        if action == "start":
+            seconds = homing_seconds or driver.cfg.max_run
+            driver.async_calibration_start(seconds)
+            assert driver.calibration is not None
+            driver.calibration["autosave"] = autosave
+        elif action == "stop":
+            driver.async_calibration_mark()
+        elif action == "cancel":
+            driver.async_calibration_cancel()
+        return driver.calibration
+
+    @callback
+    def _save_calibration(self, panel: Panel) -> None:
+        driver = panel.driver
+        assert driver is not None and driver.calibration is not None
+        cal = driver.calibration
+        cal["autosave"] = False
+        subentry = self.entry.subentries.get(panel.id)
+        if subentry is None or not cal.get("open_time") or not cal.get("close_time"):
+            return
+        LOGGER.info(
+            "%s: measured %.1f s to open and %.1f s to close",
+            panel.title,
+            cal["open_time"],
+            cal["close_time"],
+        )
+        self.hass.config_entries.async_update_subentry(
+            self.entry,
+            subentry,
+            data={
+                **subentry.data,
+                "open_time": cal["open_time"],
+                "close_time": cal["close_time"],
+            },
+        )
+
+    @callback
+    def _driver_changed(self, panel: Panel) -> None:
+        now = dt_util.utcnow()
+        driver = panel.driver
+        if (
+            driver is not None
+            and driver.calibration is not None
+            and driver.calibration["phase"] == "done"
+            and driver.calibration.get("autosave")
+        ):
+            self._save_calibration(panel)
+        self._read_panel(panel, now)
+        if panel.driver is not None and not panel.driver.busy:
+            panel.move_started = None
+            self.hass.async_create_task(self.async_evaluate(), eager_start=False)
+        else:
+            self._notify()
+            if self._refresh_unsub is None:
+                self._refresh_unsub = async_track_time_interval(
+                    self.hass, self._async_refresh_moving, REFRESH_WHILE_MOVING
+                )
+
+    @callback
+    def _async_refresh_moving(self, _now: datetime) -> None:
+        """Keep the estimate on the card fresh while a relay runs."""
+        now = dt_util.utcnow()
+        busy = False
+        for panel in self.panels.values():
+            if panel.driver is not None and panel.driver.busy:
+                busy = True
+                self._read_panel(panel, now)
+        if not busy and self._refresh_unsub is not None:
+            self._refresh_unsub()
+            self._refresh_unsub = None
+        self._notify()
+
+    @callback
+    def _driver_external(self, panel: Panel, direction: int) -> None:
+        """A relay was switched outside Helios Tilt: pause automatic control."""
+        now = dt_util.utcnow()
+        panel.manual_until = now + self.manual_pause
+        self._record(
+            panel,
+            now,
+            panel.current if panel.current is not None else 0.0,
+            REASON_MANUAL,
+            "relay switched by hand ({}), automatic control paused".format(
+                "opening" if direction > 0 else "closing"
+            ),
+            commanded=False,
+        )
+
+    @callback
+    def _driver_fault(self, panel: Panel, fault: str | None) -> None:
+        issue_id = f"relay_fault_{panel.id}"
+        if fault is None:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key="relay_fault",
+            translation_placeholders={"panel": panel.title, "fault": fault},
+        )
 
     @callback
     def async_add_listener(self, update: Callable[[], None]) -> CALLBACK_TYPE:
@@ -553,6 +784,16 @@ class HeliosSite:
     def _read_panel(self, panel: Panel, now: datetime) -> None:
         """Current angle, moving flag and PV power."""
         cfg = panel.cfg
+        if panel.driver is not None:
+            position = panel.driver.current_position(now)
+            panel.moving = panel.driver.busy
+            angle = None if position is None else panel.mapping.to_angle(position)
+            panel.current = None if angle is None else round(angle, 1)
+            panel.current_source = "estimate" if angle is not None else "unknown"
+            if cfg.pv_power_entity:
+                pv = self.hass.states.get(cfg.pv_power_entity)
+                panel.pv_actual = _float(pv.state) if _usable(pv) else None  # type: ignore[union-attr]
+            return
         actuator = self.hass.states.get(cfg.actuator_entity)
         panel.moving = bool(
             actuator is not None
@@ -868,10 +1109,15 @@ class HeliosSite:
         urgent: bool,
         now: datetime,
     ) -> None:
+        driver = panel.driver
+        if driver is not None and driver.calibrating:
+            if reason not in (REASON_WIND, REASON_STORM):
+                return  # travel calibration owns the relays
+            driver.async_calibration_cancel()  # wind and storm win: stow
         if panel.commanded is not None and abs(target - panel.commanded) < 0.5:
             panel.user_pending = False
             return
-        if panel.moving:
+        if panel.moving and not (driver is not None and urgent):
             return  # never command a moving actuator; next round
         last = panel.last_move
         if (
@@ -881,13 +1127,28 @@ class HeliosSite:
             and now - last.time < self.min_interval
         ):
             return
-        await self._async_command(panel, target, now)
+        await self._async_command(panel, target, now, reason)
         panel.user_pending = False
         self._record(panel, now, target, reason, detail)
 
-    async def _async_command(self, panel: Panel, angle: float, now: datetime) -> None:
+    async def _async_command(
+        self, panel: Panel, angle: float, now: datetime, reason: str = REASON_STRATEGY
+    ) -> None:
         cfg = panel.cfg
         position = panel.mapping.to_position(angle)
+        if panel.driver is not None:
+            # Night park homes now and then, so the day starts in sync.
+            home = bool(
+                reason == REASON_NIGHT
+                and cfg.home_at_night
+                and panel.driver.moves_since_home > 0
+            )
+            panel.commanded = angle
+            panel.expected_position = position
+            panel.move_started = now
+            panel.move_from = panel.current
+            panel.driver.async_request(position, home_first=home)
+            return
         entity_id = cfg.actuator_entity
         domain = entity_id.split(".", 1)[0]
         if domain == "cover":
@@ -1199,6 +1460,8 @@ class HeliosSite:
         now = dt_util.utcnow()
         panel.commanded = panel.estimate = panel.current = round(angle, 1)
         panel.move_started = None
+        if panel.driver is not None:
+            panel.driver.set_position(panel.mapping.to_position(angle))
         self._record(
             panel, now, angle, REASON_CALIBRATE, "angle set by hand", commanded=False
         )

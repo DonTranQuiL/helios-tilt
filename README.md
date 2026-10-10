@@ -38,7 +38,7 @@
 | 📐 **Four strategies** | Fixed annual optimum, a seasonal curve, one move per day to the day's optimum, or full sun tracking with a cloudy-day mode and a night park position. |
 | 🌬️ **Wind first** | Stows on wind speed or gusts from your weather entity and/or your own anemometer, in any unit. It resumes only after a calm period, and storm mode latches for hours. |
 | ❄️ **Weather positions** | Optional snow-shedding, heavy-rain and frost angles. |
-| 🔩 **Any actuator** | Drives a `cover`, a `number`/`input_number`, or a script. Linear or calibration-table mapping, inverted actuators, position or inclinometer feedback, or an open-loop estimate from the travel time. |
+| 🔩 **Any actuator** | Drives a `cover`, a `number`/`input_number`, a script, or a dumb actuator on **two relays** (e.g. a Tuya ZG-2002-RF), timed with interlock, countdown fail-safe and automatic homing. Linear or calibration-table mapping, inverted actuators, position or inclinometer feedback, or an open-loop estimate from the travel time. |
 | 🛡️ **Gentle on the hardware** | Never commands an actuator that is moving. Minimum time between moves, deadband and hysteresis, and a repair notice when an actuator gets stuck. |
 | ✋ **Respects your hands** | Move a panel by hand and automatic control pauses for an hour. |
 | 🃏 **Dashboard card included** | A side view of each panel with the sun, a wind gauge, Auto/Stow/Manual buttons, an angle slider, today's plan and the last moves. It loads automatically. |
@@ -123,6 +123,66 @@ Helios Tilt thinks in panel angles; your actuator thinks in positions.
 - **Calibration table:** for the non-linear geometry of a strut pushing a hinged panel. Measure a few points and enter `angle:position` pairs, for example `0:0, 15:22, 30:47, 45:75, 60:100`. Positions must rise (or fall) steadily with the angle.
 
 **Feedback:** a separate sensor reporting the actuator position or the panel angle (an inclinometer) is best. Without one, a cover's `current_position` is used. Without either (a `number` or a script), Helios estimates the position from the full-stroke **travel time**. After a power cut, tell it the real angle with `helios_tilt.calibrate`.
+
+### Two relays (timed): dumb actuators
+
+Most linear actuators (and window openers) are "dumb": two wires and internal limit switches, no position feedback. Choose **Actuator type → Two relays (timed)** and Helios drives them with two relays: one makes it extend (open), the other makes it retract (close). The position is **estimated from the run time**, with separate open and close speeds.
+
+**How it moves**
+
+1. The opposite relay is switched off and confirmed, then Helios waits at least 0.3 s (longer after a run the other way: *direction change pause*, default 1 s). It never switches a relay on while the other one is on.
+2. The relay is switched on and Helios waits for its state to confirm. Then it sets that relay's **countdown** (if configured) to the run time plus 2 s. That's a hardware fail-safe: the relay switches itself off even if Home Assistant crashes mid-run.
+3. After the computed time it switches the relay off, confirms it, and clears the countdown.
+4. If a relay doesn't confirm within 5 s, or both relays are ever on together, Helios switches both off, marks the position uncertain and raises a repair notice. No run lasts longer than the full travel time plus the homing overrun plus 5 s.
+
+> [!NOTE]
+> On Tuya relays the countdown *toggles* the relay when it expires. Set while the relay is off, it would switch it **on** later. That's why Helios arms it only after the relay is confirmed on, and sets it back to 0 after every run.
+
+**Staying in sync (homing)**
+
+- A run to 0 % or 100 % (within 2 %) keeps going for the *homing overrun* (default 15 % of the travel time) into the limit switch. That resets the estimate.
+- The first move after setup homes first. So does the first move after a restart that interrupted a run, or after a fault: the position is marked **uncertain** until then.
+- After *Home after this many moves* (default 20), and before the night park (*Home at the night park*), it homes against the *Home against* end first.
+- The estimate (stroke, uncertain flag, moves since homing) is saved, so a normal restart keeps it.
+- **Home now** (button, card or `helios_tilt.home`) does it right away.
+- Wind and storm stows still interrupt any run, including a homing run, and drive to the stow angle. On shutdown or unload both relays are switched off.
+- Operating the relays yourself (the z2m frontend, the RF remote, a wall switch) is detected. Helios tracks the run in its estimate, caps it at the maximum run time, and pauses automatic control like any manual move. Switching a relay off during a Helios run stops the run there.
+
+> [!CAUTION]
+> - The actuator **must have its own limit switches**. Helios relies on them at both ends for homing.
+> - The software interlock can't help if the relay hardware fails, or the module reboots with both channels on. Set *power-on behaviour* to **off** for both channels. Ideally, wire the motor so both directions can't be energised at once: use a DPDT/changeover wiring, or an actuator controller with a hardware interlock. Fuse the supply.
+
+**Calibrating the travel time**
+
+1. Measure or estimate the panel (or window) angle at both ends. Enter them as *Panel angle when fully closed / open*. The stroke is mapped linearly in between. For a non-linear mount, set *Mapping* to a calibration table of `angle:stroke%` pairs, e.g. `0:0, 10:30, 20:55, 30:80, 35:100`.
+2. On the integration page, open the panel's **⋮ → Reconfigure → Time the travel (calibrate)**.
+3. Enter a homing time that's long enough to close fully from anywhere (the default is the current maximum run). Submit. The actuator closes fully, pauses, then starts opening.
+4. Watch it, and press **Submit** the moment it stops at the fully open end. (Pressing too early just tells you it's still closing.) It then closes again: press **Submit** the moment it stops at the closed end.
+5. Check the measured times, adjust the end angles if needed, and save.
+
+Without the dialog you can use the panel's buttons *Travel calibration: start / end reached / cancel*, or `helios_tilt.calibrate_travel` with `action: start | stop | cancel`. The times are saved when the close run is marked. You can also enter the times by hand in the panel settings: use a stopwatch, from the moment it starts moving to the moment it stops. While calibrating, the strategy makes no moves (safety still can). Closing the dialog cancels the run and switches both relays off.
+
+<details>
+<summary><b>Example: Tuya ZG-2002-RF dual relay via Zigbee2MQTT (attic window)</b></summary>
+
+Zigbee2MQTT exposes the module, here named `attic_window`, as:
+
+| Zigbee2MQTT | Home Assistant | Use |
+| --- | --- | --- |
+| `state_l1` | `switch.attic_window_l1` | **Open relay** (extends: window opens) |
+| `state_l2` | `switch.attic_window_l2` | **Close relay** (retracts) |
+| `countdown_l1` | `number.attic_window_countdown_l1` | Open relay countdown (0-43200 s) |
+| `countdown_l2` | `number.attic_window_countdown_l2` | Close relay countdown |
+| `power_on_behavior_l1/_l2` | `select.attic_window_power_on_behavior_l1/_l2` | Set both to **off** |
+
+1. In Zigbee2MQTT, set `power_on_behavior_l1` and `power_on_behavior_l2` to **off**. As an extra cap, you can enable *inching control* for both channels (auto-off after each switch-on). Set `inching_time_1/2` a few seconds **above** the longest run (full travel time × 1.15 + 5 s). Otherwise inching cuts homing runs short.
+2. Wire L1 to the actuator's extend input and L2 to retract, as the actuator's manual shows. The actuator's internal limit switches must stop it at both ends.
+3. Add a panel: **Actuator type:** Two relays (timed). **Open relay:** `switch.attic_window_l1`. **Close relay:** `switch.attic_window_l2`. **Countdowns:** `number.attic_window_countdown_l1` / `_l2`. Enter the angles at both ends, for example 0° closed and 35° open, and set the soft limits (min/max angle) inside that range.
+4. Time the travel as above. Then press **Home now** and check that it closes fully.
+5. Test the stow angle and a wind stow (raise a test wind sensor above the stow speed) while you watch.
+
+Check the entity IDs on the device page; they follow the friendly name you gave the module in Zigbee2MQTT.
+</details>
 
 ## Wiring examples
 
@@ -275,7 +335,7 @@ One device per panel. Entity IDs follow the panel name, here `garden`:
 | Entity | Description |
 | --- | --- |
 | `sensor.garden_target_angle` | Where the panel should be. Attributes: mode, strategy, reason, detail, safety state, limits, sun position, fixed optimum, `today_curve`, `sun_path` |
-| `sensor.garden_current_angle` | Where it is. Attributes: `source` (feedback / cover / estimate), `moving`, `commanded`, `stuck` |
+| `sensor.garden_current_angle` | Where it is. Attributes: `source` (feedback / cover / estimate), `moving`, `commanded`, `stuck`, `actuator_type`; for two relays also `estimated`, `position_uncertain`, `stroke`, `direction`, `calibration` |
 | `select.garden_mode` | `auto`, `manual`, `fixed`, `seasonal`, `daily`, `tracking` |
 | `number.garden_manual_angle` | Set an angle; switches the panel to manual |
 | `switch.garden_automatic_control` | Off: no strategy moves (safety still stows) |
@@ -284,6 +344,9 @@ One device per panel. Entity IDs follow the panel name, here `garden`:
 | `sensor.garden_last_move` | Reason of the last move, with the last 10 moves in `history` |
 | `sensor.garden_moves_today` | Commanded moves today |
 | `sensor.garden_estimated_gain` | Modelled clear-sky energy today vs the fixed annual optimum, while following the strategy, in % (`instant_gain` for right now) |
+| `binary_sensor.garden_position_uncertain` | Two relays only: the estimate needs homing. Attributes: `stroke`, `moves_since_home`, `travel_since_home`, `last_homed`, `fault` |
+| `button.garden_home_now` | Two relays only: drive into the home end stop now |
+| `button.garden_travel_calibration_start` / `_end_reached` / `_cancel` | Two relays only (configuration): time the travel without the dialog |
 | `sensor.garden_pv_actual_vs_model` | Only with a PV power sensor and peak power: actual output as % of the clear-sky model |
 
 Every move also writes a **logbook** entry ("moved to 45°: Daily optimum") and fires a `helios_tilt_move` event with `panel`, `angle`, `reason` and `detail`.
@@ -299,6 +362,8 @@ Target panels by entity or device; without a target, an action applies to every 
 | `helios_tilt.resume_auto` | – | Clear stow, manual mode, the manual pause and storm mode |
 | `helios_tilt.set_mode` | `mode` | `auto`, `manual` or a strategy |
 | `helios_tilt.calibrate` | `angle` | Tell Helios the real angle without moving (needs a target) |
+| `helios_tilt.home` | – | Two relays: drive into the home end stop and reset the estimate (needs a target) |
+| `helios_tilt.calibrate_travel` | `action` (`start`/`stop`/`cancel`), `homing_seconds` | Two relays: time the travel. `stop` marks the end being reached (needs a target) |
 
 ## Dashboard card
 
