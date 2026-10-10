@@ -1,7 +1,7 @@
 // Helios Tilt card: side view of each panel with the sun, wind gauge,
 // controls, today's angle plan and the last moves. Plain custom element, no
 // build step. Keep this file ASCII-only (use \u escapes).
-const VERSION = "0.1.0b1";
+const VERSION = "0.1.0b2";
 const DOMAIN = "helios_tilt";
 const DEG = "\u00b0";
 const DASH = "\u2013";
@@ -11,7 +11,7 @@ const I18N = {
   en: {
     auto: "Auto", stow: "Stow", manual: "Manual", angle: "Angle", target: "Target", now: "Now",
     wind: "Wind", stow_at: "stow", storm_at: "storm", sun: "Sun", sun_down: "Sun below the horizon",
-    plan: "Today's plan", moves: "Last moves", no_moves: "No moves yet", gain: "vs fixed",
+    plan: "Today's plan", moves: "Last moves", no_moves: "No moves yet", gain: "today vs fixed", gain_now: "now",
     moves_today: "moves today", not_found: "No Helios Tilt panels found. Add the integration or pick a target angle sensor.",
     unavailable: "Unavailable", failed: "Action failed",
     status: {
@@ -32,7 +32,7 @@ const I18N = {
   nl: {
     auto: "Auto", stow: "Veilig", manual: "Handmatig", angle: "Hoek", target: "Doel", now: "Nu",
     wind: "Wind", stow_at: "veilig", storm_at: "storm", sun: "Zon", sun_down: "Zon onder de horizon",
-    plan: "Plan voor vandaag", moves: "Laatste bewegingen", no_moves: "Nog geen bewegingen", gain: "vs vast",
+    plan: "Plan voor vandaag", moves: "Laatste bewegingen", no_moves: "Nog geen bewegingen", gain: "vandaag t.o.v. vast", gain_now: "nu",
     moves_today: "bewegingen vandaag", not_found: "Geen Helios Tilt-panelen gevonden. Voeg de integratie toe of kies een doelhoeksensor.",
     unavailable: "Niet beschikbaar", failed: "Actie mislukt",
     status: {
@@ -388,6 +388,8 @@ class HeliosTiltCard extends HTMLElement {
     const detail = attrs.safety_detail || attrs.detail || "";
     const gainState = get("gain");
     const gain = num(gainState && gainState.state);
+    const gainNow = gainState ? num(gainState.attributes.instant_gain) : null;
+    const pct = (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
     const movesState = get("moves");
     const moves = num(movesState && movesState.state);
     const cfg = this._config;
@@ -414,7 +416,7 @@ class HeliosTiltCard extends HTMLElement {
           <div class="sub">${esc(t.target)} ${esc(deg(target))}</div>
           ${detail ? `<div class="detail">${esc(detail)}</div>` : ""}
           <div class="sub">${esc(t.sun)} ${esc(deg(attrs.sun_azimuth))} / ${esc(deg(attrs.sun_elevation))}</div>
-          ${gain !== null ? `<div class="sub">${gain >= 0 ? "+" : ""}${esc(gain.toFixed(1))}% ${esc(t.gain)}</div>` : ""}
+          ${gain !== null ? `<div class="sub" title="${esc(gainState.attributes.basis || "")}">${esc(pct(gain))} ${esc(t.gain)}${gainNow !== null ? ` <span class="dim">(${esc(t.gain_now)} ${esc(pct(gainNow))})</span>` : ""}</div>` : ""}
           ${moves !== null ? `<div class="sub">${esc(moves.toFixed(0))} ${esc(t.moves_today)}</div>` : ""}
         </div>
       </div>`;
@@ -516,6 +518,7 @@ const STYLE = `
   .figures { flex: 0 0 auto; min-width: 104px; }
   .big { font-size: 2.2em; font-weight: 600; line-height: 1.1; }
   .sub { color: var(--secondary-text-color); font-size: .9em; margin-top: 2px; }
+  .sub .dim { opacity: .75; white-space: nowrap; }
   .detail { font-size: .85em; margin-top: 4px; color: var(--hc-c, var(--secondary-text-color)); }
   .dome { fill: none; stroke: var(--divider-color, rgba(127,127,127,.3)); stroke-dasharray: 3 4; }
   .ground { stroke: var(--secondary-text-color); stroke-width: 2; opacity: .6; }

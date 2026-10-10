@@ -7,7 +7,7 @@ from typing import Final
 
 DOMAIN: Final = "helios_tilt"
 NAME: Final = "Helios Tilt"
-VERSION = "0.1.0b1"
+VERSION = "0.1.0b2"
 LOGGER = logging.getLogger(__package__)
 
 PLATFORMS: Final = ["binary_sensor", "number", "select", "sensor", "switch"]

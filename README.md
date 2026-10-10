@@ -68,13 +68,13 @@ Every minute, and whenever the weather or an actuator changes, Helios Tilt runs 
 - **Fixed:** the best fixed angle for the year at your location. It uses a clear-sky model weighted by irradiance and is worked out once at start-up.
 - **Seasonal:** a smooth curve between your *winter* and *summer* angle, peaking at the solstices. The *season weight* leans it: 50 is a plain cosine, higher stays steep longer.
 - **Daily:** each day, the single angle that collects the most clear-sky energy that day. One move in the morning, then rest. This is the default and works well with slow actuators.
-- **Tracking:** follows the sun's projected elevation. Under heavy cloud (above the cloud threshold) it goes to the flat *diffuse* angle, which catches more scattered light. At night it parks.
+- **Tracking:** follows the sun's projected elevation, a touch flatter than pointing straight at it to keep more sky light. Under heavy cloud (above the cloud threshold) it goes to the flat *diffuse* angle, which catches more scattered light. At night it parks.
 
 The raw angle is clamped to the panel's soft limits and rounded to the **step** (5° by default). **Hysteresis** keeps the current step while the raw angle hovers around a boundary. Changes smaller than the **deadband** are skipped, and normal moves wait for the **minimum interval** (5 min). Safety moves and your own actions (mode, angle, resume) go through immediately.
 
 **Axis.** A *tilt* rack leans toward its azimuth (0° = flat, 180 = south-facing). A *roll* tracker is a single-axis tracker; its azimuth is the direction of positive tilt (axis + 90°), so negative angles tilt the other way. The same math handles both.
 
-The **estimated gain** sensor compares today's modelled clear-sky energy at the actual angles against the fixed annual optimum. Give a panel a PV power sensor and peak power, and you also get **PV actual vs model**, which compares real output with the clear-sky model.
+The **estimated gain** sensor compares today's modelled clear-sky energy at the angles the panel actually held with the same panel fixed at its annual optimum (rounded to the panel's step, within its limits). Only time the panel follows its strategy counts: wind, storm and manual stows, snow/rain/frost positions, manual mode, cloudy-day diffuse parking and data freezes are left out of both sides and reported in the `excluded_minutes` attribute. The `instant_gain` attribute shows the same comparison for this moment only. Over a clear day, tracking and the daily optimum model at or above fixed. With 5° steps they can trail it by a few tenths of a percent, mostly around the equinoxes, when a tilt-only rack gains little anyway (often under 1%). The gain is largest near the solstices. Give a panel a PV power sensor and peak power, and you also get **PV actual vs model**, which compares real output with the clear-sky model.
 
 ## Safety
 
@@ -283,7 +283,7 @@ One device per panel. Entity IDs follow the panel name, here `garden`:
 | `binary_sensor.garden_wind_stow` | Stowed for wind (or by hand). Attributes: wind speed and thresholds in km/h |
 | `sensor.garden_last_move` | Reason of the last move, with the last 10 moves in `history` |
 | `sensor.garden_moves_today` | Commanded moves today |
-| `sensor.garden_estimated_gain` | Modelled energy today vs the fixed annual optimum, in % |
+| `sensor.garden_estimated_gain` | Modelled clear-sky energy today vs the fixed annual optimum, while following the strategy, in % (`instant_gain` for right now) |
 | `sensor.garden_pv_actual_vs_model` | Only with a PV power sensor and peak power: actual output as % of the clear-sky model |
 
 Every move also writes a **logbook** entry ("moved to 45°: Daily optimum") and fires a `helios_tilt_move` event with `panel`, `angle`, `reason` and `detail`.

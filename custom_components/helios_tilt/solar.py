@@ -158,3 +158,21 @@ def tracking_angle(azimuth: float, sun: SunPosition) -> float:
     sx, sy, sz = sun.vector
     hx, hy, _ = tilt_direction(azimuth)
     return math.atan2(sx * hx + sy * hy, sz) / _RAD
+
+
+def best_angle(azimuth: float, sun: SunPosition) -> float:
+    """Angle with the most clear-sky irradiance on the panel (beam + diffuse).
+
+    Pointing straight at the sun maximises the beam, but tilting also loses
+    some sky diffuse, so the best angle is a little flatter than
+    `tracking_angle`. Setting the derivative of `plane_irradiance` to zero
+    gives atan2(dni * p, dni * z + dhi / 2), with p and z the sun components
+    along the tilt direction and up. The irradiance is unimodal in the angle,
+    so clamping this to the limits gives the best angle within them.
+    """
+    dni, dhi = clear_sky(sun.elevation)
+    if dni <= 0.0:
+        return tracking_angle(azimuth, sun)
+    sx, sy, sz = sun.vector
+    hx, hy, _ = tilt_direction(azimuth)
+    return math.atan2(dni * (sx * hx + sy * hy), dni * sz + dhi / 2.0) / _RAD

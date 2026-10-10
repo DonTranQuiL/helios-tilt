@@ -18,7 +18,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.helios_tilt.const import DOMAIN, EVENT_MOVE
 
-from .conftest import PANEL_DATA, panel_of
+from .conftest import PANEL_DATA, FakeCover, panel_of
 
 TARGET = "sensor.panel_1_target_angle"
 CURRENT = "sensor.panel_1_current_angle"
@@ -402,3 +402,44 @@ async def test_state_survives_restart(hass: HomeAssistant, setup_site, cover) ->
     assert hass.states.get("binary_sensor.panel_1_storm_mode").state == "on"
     assert len(attr(hass, "sensor.panel_1_last_move", "history")) == 3
     assert cover.positions == [25, 33, 0]
+
+
+async def test_gain_over_a_clear_day_ignores_the_wind_stow(
+    hass: HomeAssistant, setup_site, weather, cover, freezer
+) -> None:
+    """Tracking and daily end a clear day ahead of fixed, despite a stow.
+
+    The stow is a safety hold, not the strategy: it is left out of both sides
+    and reported as excluded minutes.
+    """
+    freezer.move_to("2026-09-12 04:30:00+00:00")
+    FakeCover(hass, "cover.rack")
+    weather(wind_speed=12, wind_gust_speed=18)
+    await setup_site(
+        panels=[
+            {**PANEL_DATA, "strategy": "tracking", "min_angle": 5, "max_angle": 65},
+            {
+                **PANEL_DATA,
+                "title": "Rack",
+                "actuator_entity": "cover.rack",
+                "strategy": "daily",
+            },
+        ]
+    )
+    instant = []
+    for i in range(14 * 12):  # 04:30 to 18:30 UTC in 5 minute rounds
+        gusty = 96 <= i < 99  # 12:30 to 12:45 UTC
+        if gusty:
+            weather(wind_speed=38, wind_gust_speed=58)
+        else:
+            weather(wind_speed=12, wind_gust_speed=18)
+        await advance(hass, freezer, 5)
+        instant.append(attr(hass, "sensor.panel_1_estimated_gain", "instant_gain"))
+    for gain_id in ("sensor.panel_1_estimated_gain", "sensor.rack_estimated_gain"):
+        state = hass.states.get(gain_id)
+        assert float(state.state) >= 0.0, gain_id
+        assert state.attributes["excluded_minutes"] >= 15, gain_id
+        assert state.attributes["counted_since"] is not None
+        assert state.attributes["fixed_angle"] == 40.0
+    assert any(v is not None for v in instant)
+    assert hass.states.get("sensor.panel_1_last_move").state == "night"

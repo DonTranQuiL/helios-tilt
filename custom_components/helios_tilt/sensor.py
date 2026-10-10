@@ -141,9 +141,15 @@ SENSORS: tuple[HeliosSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda site, panel: panel.gain,
         attrs_fn=lambda site, panel: {
+            "basis": "today, clear-sky model, while following the strategy",
             "modelled_wh_m2": round(panel.energy_actual, 1),
             "fixed_wh_m2": round(panel.energy_fixed, 1),
-            "fixed_angle": panel.fixed_angle,
+            "fixed_angle": site.fixed_reference(panel),
+            "instant_gain": panel.instant_gain,
+            "counted_since": panel.energy_since.isoformat()
+            if panel.energy_since
+            else None,
+            "excluded_minutes": round(panel.excluded_seconds / 60.0),
         },
     ),
 )
@@ -196,6 +202,9 @@ class HeliosSensor(HeliosEntity, SensorEntity):
             "stow_angle",
             "azimuth",
             "axis",
+            "basis",
+            "instant_gain",
+            "counted_since",
         }
     )
 

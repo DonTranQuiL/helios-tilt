@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-beta.2 (2026-10-10)
+
+- Estimated gain: only time spent following the strategy counts now. Wind, storm and manual stows, weather positions, manual mode, diffuse parking and data freezes no longer drag it below zero; they are reported as `excluded_minutes`.
+- Estimated gain: the fixed reference is the annual optimum rounded to the panel's step and limits, the sun is taken mid-interval, and new attributes show the moment's value (`instant_gain`), the basis and when counting started.
+- Tracking aims for the most clear-sky irradiance (beam plus sky diffuse) instead of pointing straight at the sun, so it never models below the fixed angle.
+- Card: the gain reads "today vs fixed", with the current value next to it.
+
 ## 0.1.0-beta.1 (2026-10-10)
 
 First public beta.

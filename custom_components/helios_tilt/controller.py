@@ -259,6 +259,13 @@ class Panel:
     energy_day: date | None = None
     energy_actual: float = 0.0
     energy_fixed: float = 0.0
+    energy_since: datetime | None = None
+    excluded_seconds: float = 0.0
+    instant_gain: float | None = None
+    # The last decision followed the strategy (not safety, stow, manual,
+    # diffuse, a freeze or automatic control off): only then does the
+    # time until the next round count toward the gain.
+    following_strategy: bool = False
     pv_actual: float | None = None
     pv_model: float | None = None
     today_curve: list[tuple[str, float]] = field(default_factory=list)
@@ -278,7 +285,12 @@ class Panel:
 
     @property
     def gain(self) -> float | None:
-        """Modelled clear-sky energy today vs the annual-optimum fixed angle (%)."""
+        """Clear-sky energy today vs a panel fixed at the annual optimum (%).
+
+        Only time the panel followed its strategy counts: safety and manual
+        stows, manual mode, diffuse parking and data freezes are left out of
+        both sides, since a fixed rack would not have stowed either.
+        """
         if self.energy_fixed <= 0:
             return None
         return round((self.energy_actual / self.energy_fixed - 1.0) * 100.0, 1)
@@ -817,6 +829,11 @@ class HeliosSite:
                 else (panel.commanded if panel.commanded is not None else panel.current)
             )
             panel.target_reason, panel.target_detail = reason, detail
+            panel.following_strategy = (
+                target is not None
+                and panel.mode != MODE_MANUAL
+                and reason in (REASON_STRATEGY, REASON_NIGHT)
+            )
             if target is None:
                 panel.user_pending = False
             elif self.started:
@@ -1012,15 +1029,55 @@ class HeliosSite:
     # ---- numbers for the sensors and the card -------------------------------
 
     def _accumulate(self, panel: Panel, now: datetime, day: date) -> None:
+        """Add the time since the last round to today's gain estimate.
+
+        The panel held `panel.current` (read before this round moves it)
+        during that time; the sun is taken at the middle of the interval.
+        The reference is the annual optimum rounded to the panel's step and
+        limits: what the same rack would do on the Fixed strategy.
+        """
         if panel.energy_day != day:
             panel.energy_day, panel.energy_actual, panel.energy_fixed = day, 0.0, 0.0
-        if self._last_tick is None or self.sun is None or panel.current is None:
+            panel.energy_since, panel.excluded_seconds = None, 0.0
+        reference = self.fixed_reference(panel)
+        panel.instant_gain = None
+        if self.sun is not None and panel.current is not None and reference is not None:
+            ref_now = plane_irradiance(reference, panel.cfg.azimuth, self.sun)
+            if panel.following_strategy and ref_now >= 50.0:
+                now_actual = plane_irradiance(
+                    panel.current, panel.cfg.azimuth, self.sun
+                )
+                panel.instant_gain = round((now_actual / ref_now - 1.0) * 100.0, 1)
+        if self._last_tick is None or panel.current is None or reference is None:
             return
-        hours = min((now - self._last_tick).total_seconds(), 600) / 3600.0
+        seconds = min((now - self._last_tick).total_seconds(), 600.0)
+        if seconds <= 0:
+            return
+        mid = sun_position(
+            now - timedelta(seconds=seconds / 2.0), self.latitude, self.longitude
+        )
+        if mid.elevation <= 0.0:
+            return
+        if not panel.following_strategy:
+            panel.excluded_seconds += seconds
+            return
+        hours = seconds / 3600.0
         az = panel.cfg.azimuth
-        panel.energy_actual += plane_irradiance(panel.current, az, self.sun) * hours
-        fixed = panel.fixed_angle if panel.fixed_angle is not None else panel.current
-        panel.energy_fixed += plane_irradiance(fixed, az, self.sun) * hours
+        panel.energy_actual += plane_irradiance(panel.current, az, mid) * hours
+        panel.energy_fixed += plane_irradiance(reference, az, mid) * hours
+        if panel.energy_since is None:
+            panel.energy_since = now - timedelta(seconds=seconds)
+
+    @staticmethod
+    def fixed_reference(panel: Panel) -> float | None:
+        """The annual optimum as this panel would hold it (step and limits)."""
+        if panel.fixed_angle is None:
+            return None
+        cfg = panel.cfg
+        raw = panel.fixed_angle
+        if cfg.step > 0:
+            raw = round(raw / cfg.step) * cfg.step
+        return panel.geometry.clamp(raw)
 
     def _update_pv(self, panel: Panel) -> None:
         if (

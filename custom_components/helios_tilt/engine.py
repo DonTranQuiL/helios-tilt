@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, tzinfo
 from functools import lru_cache
 
-from .solar import SunPosition, plane_irradiance, sun_position, tracking_angle
+from .solar import SunPosition, best_angle, plane_irradiance, sun_position
 
 NIGHT_ELEVATION = -1.0  # sun below this: night park
 DAY_STEP = timedelta(minutes=10)
@@ -103,8 +103,8 @@ def seasonal_angle(
 
 
 def tracking_target(geo: PanelGeometry, sun: SunPosition) -> float:
-    """Follow the sun within the limits."""
-    return geo.clamp(tracking_angle(geo.azimuth, sun))
+    """Follow the sun within the limits (most clear-sky irradiance)."""
+    return geo.clamp(best_angle(geo.azimuth, sun))
 
 
 def round_to_step(
