@@ -12,6 +12,7 @@ from custom_components.helios_tilt.safety import (
     STALE,
     STARTUP,
     STORM,
+    TRIGGER,
     UNTIL_CLEARED,
     WIND,
     Readings,
@@ -118,3 +119,32 @@ def test_snow_rain_frost() -> None:
     assert e.evaluate(T0, wind(60, condition="snowy")).state == WIND
     off = engine(snow=False, rain=False, frost=False)
     assert off.evaluate(T0, wind(5, condition="snowy", temperature=-10)).state == OK
+
+
+def test_trigger_priority() -> None:
+    """Triggers stow after wind/storm, before missing data and weather."""
+    e = engine(rain=True)
+    s = e.evaluate(T0, wind(None, triggers=["Party", "Hail"]))
+    assert (s.state, s.detail, s.stow) == (TRIGGER, "Party, Hail", True)
+    s = e.evaluate(T0, wind(60, triggers=["Party"]))
+    assert s.state == WIND
+    s = e.evaluate(T0, wind(80, triggers=["Party"]))
+    assert s.state == STORM
+
+
+def test_dedicated_sensors_override_condition() -> None:
+    e = engine(rain=True)
+    assert e.evaluate(T0, wind(5, condition="sunny", rain=True)).state == RAIN
+    assert e.evaluate(T0, wind(5, condition="pouring", rain=False)).state == OK
+    assert e.evaluate(T0, wind(5, condition="pouring", rain=None)).state == RAIN
+    assert e.evaluate(T0, wind(5, condition="sunny", snow=True)).state == SNOW
+    assert e.evaluate(T0, wind(5, condition="snowy", snow=False)).state == OK
+
+
+def test_without_wind() -> None:
+    """The direction rule's view: wind ignored, storm and the rest kept."""
+    e = engine()
+    assert e.evaluate(T0, wind(60, condition="snowy")).state == WIND
+    assert e.without_wind(T0, wind(60, condition="snowy")).state == SNOW
+    assert e.evaluate(T0, wind(80)).state == STORM
+    assert e.without_wind(T0, wind(80)).state == STORM

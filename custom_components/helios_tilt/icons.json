@@ -20,7 +20,9 @@
           "snow": "mdi:weather-snowy",
           "rain": "mdi:weather-pouring",
           "frost": "mdi:snowflake-thermometer",
-          "calibrate": "mdi:tune-vertical"
+          "calibrate": "mdi:tune-vertical",
+          "trigger": "mdi:alarm-light",
+          "quiet": "mdi:sleep"
         }
       },
       "moves_today": {

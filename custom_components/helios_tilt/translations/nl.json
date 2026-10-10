@@ -14,7 +14,7 @@
         "data_description": {
           "latitude": "Standaard de locatie van Home Assistant.",
           "longitude": "Standaard de locatie van Home Assistant.",
-          "weather_entity": "Windsnelheid, windstoten, conditie (sneeuw/regen), temperatuur en bewolking.",
+          "weather_entity": "Windsnelheid, windstoten, conditie (sneeuw/regen), temperatuur en bewolking. Kies bij voorkeur een weer-entiteit met windstoten (bv. Buienradar): stoten doen de schade.",
           "wind_sensor": "Optionele eigen windmeter. De hoogste van alle windwaarden telt."
         }
       },
@@ -179,7 +179,7 @@
         "data_description": {
           "latitude": "Standaard de locatie van Home Assistant.",
           "longitude": "Standaard de locatie van Home Assistant.",
-          "weather_entity": "Windsnelheid, windstoten, conditie (sneeuw/regen), temperatuur en bewolking.",
+          "weather_entity": "Windsnelheid, windstoten, conditie (sneeuw/regen), temperatuur en bewolking. Kies bij voorkeur een weer-entiteit met windstoten (bv. Buienradar): stoten doen de schade.",
           "wind_sensor": "Optionele eigen windmeter. De hoogste van alle windwaarden telt."
         }
       }
@@ -193,6 +193,7 @@
       "actuator_in_use": "Deze actuator stuurt al een ander paneel aan.",
       "resume_above_stow": "De hervatsnelheid moet onder de veilige-standsnelheid liggen.",
       "storm_below_stow": "De stormsnelheid moet minstens de veilige-standsnelheid zijn.",
+      "quiet_incomplete": "Stille uren hebben een begin- en een eindtijd nodig.",
       "actuator_required": "Kies de actuator-entiteit, of kies het type twee relais.",
       "relays_required": "Kies zowel het open- als het dicht-relais.",
       "same_relay": "Het open- en dicht-relais moeten verschillende schakelaars zijn.",
@@ -423,6 +424,7 @@
         "actuator_in_use": "Deze actuator stuurt al een ander paneel aan.",
         "resume_above_stow": "De hervatsnelheid moet onder de veilige-standsnelheid liggen.",
         "storm_below_stow": "De stormsnelheid moet minstens de veilige-standsnelheid zijn.",
+        "quiet_incomplete": "Stille uren hebben een begin- en een eindtijd nodig.",
         "actuator_required": "Kies de actuator-entiteit, of kies het type twee relais.",
         "relays_required": "Kies zowel het open- als het dicht-relais.",
         "same_relay": "Het open- en dicht-relais moeten verschillende schakelaars zijn.",
@@ -471,6 +473,65 @@
           "min_move_interval": "Veiligheidsbewegingen negeren dit.",
           "deadband": "Kleinere hoekveranderingen worden overgeslagen.",
           "hysteresis": "Extra marge voordat een afgeronde doelhoek een stap verspringt."
+        },
+        "sections": {
+          "sources": {
+            "name": "Eigen sensoren (optioneel)",
+            "description": "Overschrijf de weer-entiteit met je eigen sensoren.",
+            "data": {
+              "rain_sensor": "Regensensor",
+              "rain_threshold": "Zware regen vanaf",
+              "snow_sensor": "Sneeuwsensor",
+              "snow_threshold": "Sneeuw vanaf dikte",
+              "temperature_sensor": "Buitentemperatuursensor"
+            },
+            "data_description": {
+              "rain_sensor": "Een binaire sensor (aan = zware regen) of een neerslagintensiteit (mm/u of in/u). Gaat voor de weerconditie zolang hij een waarde heeft.",
+              "rain_threshold": "Bij een intensiteitssensor: zware regen vanaf deze waarde. Andere eenheden worden omgerekend.",
+              "snow_sensor": "Een binaire sensor (aan = sneeuw) of een sneeuwdiktesensor (cm, mm, m of in).",
+              "snow_threshold": "Bij een diktesensor: sneeuwstand vanaf deze dikte.",
+              "temperature_sensor": "Voor de vorstgrens in plaats van de weertemperatuur. Fahrenheit wordt omgerekend."
+            }
+          },
+          "triggers": {
+            "name": "Eigen stow-triggers (optioneel)",
+            "description": "Elke entiteit die aan staat dwingt de veilige stand af (veiligheidsprioriteit).",
+            "data": {
+              "stow_triggers": "Trigger-entiteiten",
+              "trigger_angle": "Hoek bij trigger"
+            },
+            "data_description": {
+              "stow_triggers": "Binaire sensoren, input booleans, schakelaars... Veilige stand zolang er een aan staat.",
+              "trigger_angle": "Leeg = de eigen veilige stand van elk paneel."
+            }
+          },
+          "quiet": {
+            "name": "Stille uren (optioneel)",
+            "description": "Geen automatische bewegingen in dit venster (mag over middernacht).",
+            "data": {
+              "quiet_start": "Begin",
+              "quiet_end": "Einde",
+              "quiet_allow_safety": "Veiligheidsbewegingen toestaan in stille uren"
+            },
+            "data_description": {
+              "quiet_allow_safety": "Uit: wind, triggers, sneeuw, regen en vorst wachten ook tot het einde. Stormmodus beweegt altijd."
+            }
+          },
+          "direction": {
+            "name": "Windrichtingregel (optioneel)",
+            "description": "Alleen veilige stand bij wind van voren of van achteren.",
+            "data": {
+              "direction_rule": "Windrichting gebruiken",
+              "direction_sensor": "Windrichtingsensor",
+              "direction_sides": "Veilige stand bij wind van",
+              "direction_sector": "Sectorbreedte (plus/min)"
+            },
+            "data_description": {
+              "direction_rule": "Zijwind geeft geen veilige stand. Boven de stormsnelheid gaat elk paneel veilig; zonder richting ook.",
+              "direction_sensor": "Graden (0 = noord) of N/NO/... Leeg = de windrichting van de weer-entiteit.",
+              "direction_sector": "Graden rond de voorkant (azimut) of achterkant van het paneel."
+            }
+          }
         }
       }
     },
@@ -483,6 +544,7 @@
       "actuator_in_use": "Deze actuator stuurt al een ander paneel aan.",
       "resume_above_stow": "De hervatsnelheid moet onder de veilige-standsnelheid liggen.",
       "storm_below_stow": "De stormsnelheid moet minstens de veilige-standsnelheid zijn.",
+      "quiet_incomplete": "Stille uren hebben een begin- en een eindtijd nodig.",
       "actuator_required": "Kies de actuator-entiteit, of kies het type twee relais.",
       "relays_required": "Kies zowel het open- als het dicht-relais.",
       "same_relay": "Het open- en dicht-relais moeten verschillende schakelaars zijn.",
@@ -526,7 +588,9 @@
           "snow": "Sneeuw",
           "rain": "Zware regen",
           "frost": "Vorst",
-          "calibrate": "Kalibratie"
+          "calibrate": "Kalibratie",
+          "trigger": "Stow-trigger",
+          "quiet": "Stille uren"
         }
       }
     },
@@ -619,6 +683,13 @@
         "tracking": "Zon volgen"
       }
     },
+    "direction_sides": {
+      "options": {
+        "both": "Voor- en achterkant",
+        "front": "Alleen voorkant",
+        "rear": "Alleen achterkant"
+      }
+    },
     "actuator_type": {
       "options": {
         "entity": "Entiteit (cover, number of script)",
@@ -658,6 +729,10 @@
         "storm": {
           "name": "Stormmodus",
           "description": "Zet ook stormmodus aan voor de hele locatie."
+        },
+        "duration": {
+          "name": "Duur",
+          "description": "Daarna automatisch hervatten. Leeg = tot je hervat."
         }
       }
     },

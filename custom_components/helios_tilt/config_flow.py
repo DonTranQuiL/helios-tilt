@@ -42,6 +42,10 @@ from .const import (
     CONF_CLOUD_THRESHOLD,
     CONF_DEADBAND,
     CONF_DIFFUSE_ANGLE,
+    CONF_DIRECTION_RULE,
+    CONF_DIRECTION_SECTOR,
+    CONF_DIRECTION_SENSOR,
+    CONF_DIRECTION_SIDES,
     CONF_FEEDBACK,
     CONF_FEEDBACK_KIND,
     CONF_FROST_ANGLE,
@@ -67,12 +71,19 @@ from .const import (
     CONF_POS_AT_MIN,
     CONF_PV_PEAK,
     CONF_PV_POWER,
+    CONF_QUIET_END,
+    CONF_QUIET_SAFETY,
+    CONF_QUIET_START,
     CONF_RAIN_ANGLE,
     CONF_RAIN_MODE,
+    CONF_RAIN_SENSOR,
+    CONF_RAIN_THRESHOLD,
     CONF_REVERSE_DELAY,
     CONF_SEASON_WEIGHT,
     CONF_SNOW_ANGLE,
     CONF_SNOW_MODE,
+    CONF_SNOW_SENSOR,
+    CONF_SNOW_THRESHOLD,
     CONF_STALE_MINUTES,
     CONF_START_DELAY,
     CONF_STEP,
@@ -81,7 +92,10 @@ from .const import (
     CONF_STOW_ANGLE,
     CONF_STRATEGY,
     CONF_SUMMER_ANGLE,
+    CONF_TEMP_SENSOR,
     CONF_TRAVEL_TIME,
+    CONF_TRIGGER_ANGLE,
+    CONF_TRIGGERS,
     CONF_WEATHER,
     CONF_WIND_RESUME,
     CONF_WIND_SENSOR,
@@ -95,6 +109,7 @@ from .const import (
     MAPPING_TABLE,
     NAME,
     PANEL_DEFAULTS,
+    SIDES,
     SITE_DEFAULTS,
     STRATEGIES,
     SUBENTRY_PANEL,
@@ -226,6 +241,95 @@ def _thresholds_schema(values: dict[str, Any]) -> vol.Schema:
             ),
         }
     )
+
+
+OPT_SOURCES = "sources"
+OPT_TRIGGERS = "triggers"
+OPT_QUIET = "quiet"
+OPT_DIRECTION = "direction"
+OPTION_SECTIONS = (OPT_SOURCES, OPT_TRIGGERS, OPT_QUIET, OPT_DIRECTION)
+OPTION_ENTITY_KEYS = (
+    CONF_RAIN_SENSOR,
+    CONF_SNOW_SENSOR,
+    CONF_TEMP_SENSOR,
+    CONF_TRIGGERS,
+    CONF_TRIGGER_ANGLE,
+    CONF_QUIET_START,
+    CONF_QUIET_END,
+    CONF_DIRECTION_SENSOR,
+)
+
+
+def _options_schema(values: dict[str, Any]) -> vol.Schema:
+    """Thresholds plus collapsed sections for the optional extras."""
+    v = {**SITE_DEFAULTS, **values}
+    fields = dict(_thresholds_schema(values).schema)
+    sources = {
+        _opt(CONF_RAIN_SENSOR, v): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["binary_sensor", "sensor"])
+        ),
+        vol.Required(CONF_RAIN_THRESHOLD, default=v[CONF_RAIN_THRESHOLD]): _num(
+            0.1, 100, 0.1, "mm/h"
+        ),
+        _opt(CONF_SNOW_SENSOR, v): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["binary_sensor", "sensor"])
+        ),
+        vol.Required(CONF_SNOW_THRESHOLD, default=v[CONF_SNOW_THRESHOLD]): _num(
+            0.1, 100, 0.1, "cm"
+        ),
+        _opt(CONF_TEMP_SENSOR, v): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
+        ),
+    }
+    triggers = {
+        _opt(CONF_TRIGGERS, v): selector.EntitySelector(
+            selector.EntitySelectorConfig(multiple=True)
+        ),
+        _opt(CONF_TRIGGER_ANGLE, v): _angle(),
+    }
+    quiet = {
+        _opt(CONF_QUIET_START, v): selector.TimeSelector(),
+        _opt(CONF_QUIET_END, v): selector.TimeSelector(),
+        vol.Required(CONF_QUIET_SAFETY, default=v[CONF_QUIET_SAFETY]): bool,
+    }
+    direction = {
+        vol.Required(CONF_DIRECTION_RULE, default=v[CONF_DIRECTION_RULE]): bool,
+        _opt(CONF_DIRECTION_SENSOR, v): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["sensor", "input_number"])
+        ),
+        vol.Required(CONF_DIRECTION_SIDES, default=v[CONF_DIRECTION_SIDES]): _choice(
+            SIDES, CONF_DIRECTION_SIDES
+        ),
+        vol.Required(CONF_DIRECTION_SECTOR, default=v[CONF_DIRECTION_SECTOR]): _num(
+            5, 90, 1, "°"
+        ),
+    }
+    for name, schema in (
+        (OPT_SOURCES, sources),
+        (OPT_TRIGGERS, triggers),
+        (OPT_QUIET, quiet),
+        (OPT_DIRECTION, direction),
+    ):
+        fields[vol.Required(name)] = section(vol.Schema(schema), {"collapsed": True})
+    return vol.Schema(fields)
+
+
+def _flatten_options(user_input: dict[str, Any]) -> dict[str, Any]:
+    data = {k: v for k, v in user_input.items() if k not in OPTION_SECTIONS}
+    for name in OPTION_SECTIONS:
+        data.update(user_input.get(name, {}))
+    for key in OPTION_ENTITY_KEYS:
+        if key in data and data[key] in (None, "", []):
+            data.pop(key)
+    return data
+
+
+def _validate_options(data: dict[str, Any]) -> dict[str, str]:
+    if errors := _validate_thresholds(data):
+        return errors
+    if (CONF_QUIET_START in data) != (CONF_QUIET_END in data):
+        return {"base": "quiet_incomplete"}
+    return {}
 
 
 def _validate_thresholds(user_input: dict[str, Any]) -> dict[str, str]:
@@ -762,13 +866,15 @@ class HeliosOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """One form."""
         errors: dict[str, str] = {}
+        values = dict(self.config_entry.options)
         if user_input is not None:
-            errors = _validate_thresholds(user_input)
+            data = _flatten_options(user_input)
+            errors = _validate_options(data)
             if not errors:
-                return self.async_create_entry(data=user_input)
-        values = {**self.config_entry.options, **(user_input or {})}
+                return self.async_create_entry(data=data)
+            values = data
         return self.async_show_form(
-            step_id="init", data_schema=_thresholds_schema(values), errors=errors
+            step_id="init", data_schema=_options_schema(values), errors=errors
         )
 
 

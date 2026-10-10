@@ -1,7 +1,7 @@
 // Helios Tilt card: side view of each panel with the sun, wind gauge,
 // controls, today's angle plan and the last moves. Plain custom element, no
 // build step. Keep this file ASCII-only (use \u escapes).
-const VERSION = "0.1.0b5";
+const VERSION = "0.1.0b6";
 const DOMAIN = "helios_tilt";
 const DEG = "\u00b0";
 const DASH = "\u2013";
@@ -16,8 +16,9 @@ const I18N = {
     unavailable: "Unavailable", failed: "Action failed",
     estimated: "estimated", uncertain: "Position uncertain", home: "Home", home_title: "Drive into the end stop to re-learn the position",
     moving_open: "opening", moving_close: "closing", calibrating: "Timing the travel", offline: "Relay offline", offline_title: "Unavailable: ",
+    quiet: "Quiet hours", quiet_until: "Quiet hours until ",
     status: {
-      storm: "Storm mode", wind: "Wind stow", stowed: "Stowed", manual: "Manual", paused: "Paused after manual move",
+      storm: "Storm mode", wind: "Wind stow", trigger: "Stow trigger", quiet: "Quiet hours", stowed: "Stowed", manual: "Manual", paused: "Paused after manual move",
       off: "Auto off", startup: "Waiting for data", stale: "Holding: no wind data", night: "Night park",
       diffuse: "Cloudy: flat", snow: "Snow shedding", rain: "Heavy rain", frost: "Frost",
       fixed: "Annual optimum", seasonal: "Seasonal curve", daily: "Daily optimum", tracking: "Tracking the sun",
@@ -25,6 +26,7 @@ const I18N = {
     reasons: {
       strategy: "Strategy", night: "Night park", diffuse: "Cloudy", manual: "Manual", wind: "Wind stow",
       storm: "Storm mode", stow: "Stowed", snow: "Snow", rain: "Heavy rain", frost: "Frost", calibrate: "Calibration",
+      trigger: "Stow trigger", quiet: "Quiet hours",
     },
     editor: {
       title: "Title", entities: "Panels (target angle sensors, empty = all)", show_wind: "Wind gauge",
@@ -39,8 +41,9 @@ const I18N = {
     unavailable: "Niet beschikbaar", failed: "Actie mislukt",
     estimated: "geschat", uncertain: "Positie onzeker", home: "Referentie", home_title: "Tot de eindstop rijden om de positie opnieuw te bepalen",
     moving_open: "opent", moving_close: "sluit", calibrating: "Looptijd meten", offline: "Relais offline", offline_title: "Niet beschikbaar: ",
+    quiet: "Stille uren", quiet_until: "Stille uren tot ",
     status: {
-      storm: "Stormmodus", wind: "Wind: veilige stand", stowed: "Veilige stand", manual: "Handmatig",
+      storm: "Stormmodus", wind: "Wind: veilige stand", trigger: "Stow-trigger", quiet: "Stille uren", stowed: "Veilige stand", manual: "Handmatig",
       paused: "Gepauzeerd na handmatige beweging", off: "Auto uit", startup: "Wacht op data",
       stale: "Vasthouden: geen winddata", night: "Nachtstand", diffuse: "Bewolkt: plat", snow: "Sneeuw afglijden",
       rain: "Zware regen", frost: "Vorst", fixed: "Jaaroptimum", seasonal: "Seizoenscurve", daily: "Dagoptimum",
@@ -49,6 +52,7 @@ const I18N = {
     reasons: {
       strategy: "Strategie", night: "Nachtstand", diffuse: "Bewolkt", manual: "Handmatig", wind: "Wind",
       storm: "Stormmodus", stow: "Veilige stand", snow: "Sneeuw", rain: "Zware regen", frost: "Vorst", calibrate: "Kalibratie",
+      trigger: "Stow-trigger", quiet: "Stille uren",
     },
     editor: {
       title: "Titel", entities: "Panelen (doelhoeksensoren, leeg = alle)", show_wind: "Windmeter",
@@ -157,7 +161,10 @@ function statusOf(t, attrs, stormOn) {
   const s = t.status;
   const safety = attrs.safety;
   if (stormOn || safety === "storm") return [s.storm, "bad"];
-  if (safety === "wind") return [s.wind, "bad"];
+  if (attrs.reason === "trigger") return [s.trigger, "bad"];
+  if (attrs.reason === "quiet" && safety !== "storm") return [s.quiet, "idle"];
+  if (safety === "wind" && !attrs.wind_exempt) return [s.wind, "bad"];
+  if (safety === "trigger") return [s.trigger, "bad"];
   if (attrs.stowed || attrs.reason === "stow") return [s.stowed, "warn"];
   if (safety === "startup") return [s.startup, "idle"];
   if (safety === "stale") return [s.stale, "idle"];
@@ -397,7 +404,10 @@ class HeliosTiltCard extends HTMLElement {
     const calibrating = relays && cur.calibration && cur.calibration.phase;
     const offline = relays && cur.actuator_available === false;
     const offlineList = Array.isArray(cur.unavailable_entities) ? cur.unavailable_entities.join(", ") : "";
-    const detail = attrs.safety_detail || attrs.detail || "";
+    const quiet = attrs.quiet === true;
+    const quietTitle = attrs.quiet_until ? t.quiet_until + timeOf(attrs.quiet_until) : t.quiet;
+    const detail = attrs.reason === "trigger" || attrs.reason === "quiet" || attrs.wind_exempt
+      ? attrs.detail || "" : attrs.safety_detail || attrs.detail || "";
     const gainState = get("gain");
     const gain = num(gainState && gainState.state);
     const gainNow = gainState ? num(gainState.attributes.instant_gain) : null;
@@ -412,7 +422,8 @@ class HeliosTiltCard extends HTMLElement {
     const busy = (k) => (this._busy.has(`${targetId}:${k}`) ? " disabled" : "");
     const active = (on) => (on ? " active" : "");
     const isManual = attrs.mode === "manual";
-    const isStow = Boolean(attrs.stowed) || attrs.safety === "storm" || attrs.safety === "wind";
+    const isStow = Boolean(attrs.stowed) || attrs.safety === "storm" || attrs.safety === "trigger" ||
+      (attrs.safety === "wind" && !attrs.wind_exempt);
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
@@ -421,7 +432,7 @@ class HeliosTiltCard extends HTMLElement {
         <div class="name">${esc(name)}</div>
         <span class="chip ${cls}">${esc(label)}</span>
       </div>
-      ${offline || uncertain || calibrating ? `<div class="badges">${offline ? `<span class="chip bad badge-offline" title="${esc(t.offline_title + offlineList)}">${esc(t.offline)}</span>` : ""}${uncertain ? `<span class="chip warn badge-uncertain">${esc(t.uncertain)}</span>` : ""}${calibrating ? `<span class="chip info">${esc(t.calibrating)}</span>` : ""}</div>` : ""}
+      ${offline || uncertain || calibrating || quiet ? `<div class="badges">${quiet ? `<span class="chip night badge-quiet" title="${esc(quietTitle)}">${esc(t.quiet)}</span>` : ""}${offline ? `<span class="chip bad badge-offline" title="${esc(t.offline_title + offlineList)}">${esc(t.offline)}</span>` : ""}${uncertain ? `<span class="chip warn badge-uncertain">${esc(t.uncertain)}</span>` : ""}${calibrating ? `<span class="chip info">${esc(t.calibrating)}</span>` : ""}</div>` : ""}
       <div class="hero">
         ${sideView(attrs, current, target, cls)}
         <div class="figures">

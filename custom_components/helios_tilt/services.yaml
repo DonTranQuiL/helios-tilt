@@ -21,6 +21,9 @@ stow:
       default: false
       selector:
         boolean:
+    duration:
+      selector:
+        duration:
 resume_auto:
   target:
     entity:

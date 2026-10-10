@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0-beta.6 (2026-10-10)
+
+- **Source transparency:** the *Wind stow* and *Storm mode* sensors (and diagnostics) show the sources (`weather_entity`, `wind_sensor`), each value (`weather_wind`, `weather_gust`, `sensor_wind`) and which one drives the wind now (`wind_source`), plus the wind bearing and the temperature source. The README and the setup help recommend a weather entity with gusts (e.g. Buienradar).
+- **Dedicated sensors** (Configure, optional): rain (binary sensor, or a rate in mm/h, mm/d, in/h, in/d with a threshold), snow (binary sensor, or a depth in mm/cm/m/in/ft with a threshold) and an outdoor temperature sensor (°F converted) for frost. They override the weather condition while available and fall back to it otherwise.
+- **Custom stow triggers** (Configure, optional): a list of entities; while any is on, panels stow at the trigger angle (or their stow angle), with safety priority. The reason and the card name the trigger.
+- `helios_tilt.stow` takes an optional `duration` and resumes by itself afterwards.
+- **Quiet hours** (Configure, optional): a time window, which may cross midnight, without automatic moves. Safety moves are allowed by default (configurable); storm mode always moves, as do your own commands. The target shows reason `quiet` and *until HH:MM*; the card shows a Quiet hours badge.
+- **Wind direction rule** (Configure, optional, off by default): only stow for wind within ± X° of the panel's front and/or rear, from the weather `wind_bearing` or a direction sensor (degrees or N/NE/…). Storm speed always stows; no bearing means stowing from any direction.
+- Options are grouped into collapsed sections. en/nl translations.
+
 ## 0.1.0-beta.5 (2026-10-10)
 
 - Two relays: before any run or calibration, both relays (and the countdowns, if set) must be available. While one is unavailable (Zigbee device offline), nothing is switched and nothing is retried. Helios logs `Relay switch.X is unavailable (Zigbee device offline?)` once and raises a *relay offline* repair. It all clears by itself when the device is back, and the panel then drives to its target.

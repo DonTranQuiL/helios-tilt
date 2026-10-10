@@ -109,6 +109,25 @@ async function click(card, selector) {
     c.ghost = ghost.shadowRoot.querySelectorAll(".ghost").length;
     c.stowed_chip = ghost.shadowRoot.querySelector(".chip").textContent;
 
+    // Quiet hours badge; a stow trigger names itself in the detail line.
+    const quietStates = clone(DATA.states);
+    Object.assign(quietStates[DATA.target].attributes, { quiet: true, quiet_until: "2026-10-11T07:00:00+02:00", reason: "quiet", detail: "until 07:00" });
+    const quietCard = await newCard({ entities: [DATA.target] }, makeHass(quietStates));
+    c.quiet_badge = quietCard.shadowRoot.querySelector(".badge-quiet")?.textContent;
+    c.quiet_title = quietCard.shadowRoot.querySelector(".badge-quiet")?.getAttribute("title") || "";
+    c.quiet_chip = quietCard.shadowRoot.querySelector(".chip").textContent;
+    c.no_quiet_badge = root.querySelectorAll(".badge-quiet").length;
+    const trigStates = clone(DATA.states);
+    Object.assign(trigStates[DATA.target].attributes, { safety: "trigger", safety_detail: "Party mode", reason: "trigger", detail: "Party mode" });
+    const trigCard = await newCard({ entities: [DATA.target] }, makeHass(trigStates));
+    c.trigger_chip = trigCard.shadowRoot.querySelector(".chip").textContent;
+    c.trigger_detail = trigCard.shadowRoot.querySelector(".detail")?.textContent;
+    c.trigger_stow_active = trigCard.shadowRoot.querySelector('button[data-action="stow"]')?.classList.contains("active");
+    const exemptStates = clone(DATA.states);
+    Object.assign(exemptStates[DATA.target].attributes, { safety: "wind", wind_exempt: true });
+    const exemptCard = await newCard({ entities: [DATA.target] }, makeHass(exemptStates));
+    c.exempt_chip = exemptCard.shadowRoot.querySelector(".chip").textContent;
+
     // Night: a moon instead of the sun.
     const night = clone(DATA.states);
     night[DATA.target].attributes.sun_elevation = -20;

@@ -25,13 +25,13 @@ SITE_DESC = {
     "en": {
         "latitude": "Defaults to your Home Assistant location.",
         "longitude": "Defaults to your Home Assistant location.",
-        "weather_entity": "Wind speed, gusts, condition (snow/rain), temperature and cloud cover.",
+        "weather_entity": "Wind speed, gusts, condition (snow/rain), temperature and cloud cover. Prefer a weather entity that reports gusts (e.g. Buienradar): gusts are what damage panels.",
         "wind_sensor": "Optional local anemometer. The highest of all wind readings is used.",
     },
     "nl": {
         "latitude": "Standaard de locatie van Home Assistant.",
         "longitude": "Standaard de locatie van Home Assistant.",
-        "weather_entity": "Windsnelheid, windstoten, conditie (sneeuw/regen), temperatuur en bewolking.",
+        "weather_entity": "Windsnelheid, windstoten, conditie (sneeuw/regen), temperatuur en bewolking. Kies bij voorkeur een weer-entiteit met windstoten (bv. Buienradar): stoten doen de schade.",
         "wind_sensor": "Optionele eigen windmeter. De hoogste van alle windwaarden telt.",
     },
 }
@@ -236,6 +236,7 @@ ERRORS = {
         "actuator_in_use": "This actuator already drives another panel.",
         "resume_above_stow": "The resume speed must be below the stow speed.",
         "storm_below_stow": "The storm speed must be at least the stow speed.",
+        "quiet_incomplete": "Quiet hours need both a start and an end time.",
     },
     "nl": {
         "wind_source_required": "Kies een weer-entiteit of een windsnelheidssensor: windbeveiliging heeft er een nodig.",
@@ -246,6 +247,136 @@ ERRORS = {
         "actuator_in_use": "Deze actuator stuurt al een ander paneel aan.",
         "resume_above_stow": "De hervatsnelheid moet onder de veilige-standsnelheid liggen.",
         "storm_below_stow": "De stormsnelheid moet minstens de veilige-standsnelheid zijn.",
+        "quiet_incomplete": "Stille uren hebben een begin- en een eindtijd nodig.",
+    },
+}
+# Options sections: name, description, fields, field help.
+OPT_SECTIONS = {
+    "en": {
+        "sources": (
+            "Dedicated sensors (optional)",
+            "Override the weather entity with your own sensors.",
+            {
+                "rain_sensor": "Rain sensor",
+                "rain_threshold": "Heavy rain from",
+                "snow_sensor": "Snow sensor",
+                "snow_threshold": "Snow from depth",
+                "temperature_sensor": "Outdoor temperature sensor",
+            },
+            {
+                "rain_sensor": "A binary sensor (on = heavy rain) or a precipitation rate sensor (mm/h or in/h). Overrides the weather condition while it has a value.",
+                "rain_threshold": "For a rate sensor: heavy rain at or above this rate. Other units are converted.",
+                "snow_sensor": "A binary sensor (on = snow) or a snow depth sensor (cm, mm, m or in).",
+                "snow_threshold": "For a depth sensor: snow mode at or above this depth.",
+                "temperature_sensor": "Used for the frost threshold instead of the weather temperature. Fahrenheit is converted.",
+            },
+        ),
+        "triggers": (
+            "Custom stow triggers (optional)",
+            "Any entity that is on forces the stow position (safety priority).",
+            {
+                "stow_triggers": "Trigger entities",
+                "trigger_angle": "Trigger stow angle",
+            },
+            {
+                "stow_triggers": "Binary sensors, input booleans, switches... Stow while any of them is on.",
+                "trigger_angle": "Empty = each panel's own stow angle.",
+            },
+        ),
+        "quiet": (
+            "Quiet hours (optional)",
+            "No automatic moves in this window (may cross midnight).",
+            {
+                "quiet_start": "Start",
+                "quiet_end": "End",
+                "quiet_allow_safety": "Allow safety moves in quiet hours",
+            },
+            {
+                "quiet_allow_safety": "Off: wind, triggers, snow, rain and frost also wait for the end. Storm mode always moves.",
+            },
+        ),
+        "direction": (
+            "Wind direction rule (optional)",
+            "Only stow for wind from the front or rear of the panel.",
+            {
+                "direction_rule": "Use the wind direction",
+                "direction_sensor": "Wind direction sensor",
+                "direction_sides": "Stow for wind from",
+                "direction_sector": "Sector width (plus/minus)",
+            },
+            {
+                "direction_rule": "Wind from the side doesn't stow. Above the storm speed every panel stows regardless; without a direction every panel stows.",
+                "direction_sensor": "Degrees (0 = north) or N/NE/... Empty = the weather entity's wind bearing.",
+                "direction_sector": "Degrees around the panel's front (azimuth) or rear.",
+            },
+        ),
+    },
+    "nl": {
+        "sources": (
+            "Eigen sensoren (optioneel)",
+            "Overschrijf de weer-entiteit met je eigen sensoren.",
+            {
+                "rain_sensor": "Regensensor",
+                "rain_threshold": "Zware regen vanaf",
+                "snow_sensor": "Sneeuwsensor",
+                "snow_threshold": "Sneeuw vanaf dikte",
+                "temperature_sensor": "Buitentemperatuursensor",
+            },
+            {
+                "rain_sensor": "Een binaire sensor (aan = zware regen) of een neerslagintensiteit (mm/u of in/u). Gaat voor de weerconditie zolang hij een waarde heeft.",
+                "rain_threshold": "Bij een intensiteitssensor: zware regen vanaf deze waarde. Andere eenheden worden omgerekend.",
+                "snow_sensor": "Een binaire sensor (aan = sneeuw) of een sneeuwdiktesensor (cm, mm, m of in).",
+                "snow_threshold": "Bij een diktesensor: sneeuwstand vanaf deze dikte.",
+                "temperature_sensor": "Voor de vorstgrens in plaats van de weertemperatuur. Fahrenheit wordt omgerekend.",
+            },
+        ),
+        "triggers": (
+            "Eigen stow-triggers (optioneel)",
+            "Elke entiteit die aan staat dwingt de veilige stand af (veiligheidsprioriteit).",
+            {
+                "stow_triggers": "Trigger-entiteiten",
+                "trigger_angle": "Hoek bij trigger",
+            },
+            {
+                "stow_triggers": "Binaire sensoren, input booleans, schakelaars... Veilige stand zolang er een aan staat.",
+                "trigger_angle": "Leeg = de eigen veilige stand van elk paneel.",
+            },
+        ),
+        "quiet": (
+            "Stille uren (optioneel)",
+            "Geen automatische bewegingen in dit venster (mag over middernacht).",
+            {
+                "quiet_start": "Begin",
+                "quiet_end": "Einde",
+                "quiet_allow_safety": "Veiligheidsbewegingen toestaan in stille uren",
+            },
+            {
+                "quiet_allow_safety": "Uit: wind, triggers, sneeuw, regen en vorst wachten ook tot het einde. Stormmodus beweegt altijd.",
+            },
+        ),
+        "direction": (
+            "Windrichtingregel (optioneel)",
+            "Alleen veilige stand bij wind van voren of van achteren.",
+            {
+                "direction_rule": "Windrichting gebruiken",
+                "direction_sensor": "Windrichtingsensor",
+                "direction_sides": "Veilige stand bij wind van",
+                "direction_sector": "Sectorbreedte (plus/min)",
+            },
+            {
+                "direction_rule": "Zijwind geeft geen veilige stand. Boven de stormsnelheid gaat elk paneel veilig; zonder richting ook.",
+                "direction_sensor": "Graden (0 = noord) of N/NO/... Leeg = de windrichting van de weer-entiteit.",
+                "direction_sector": "Graden rond de voorkant (azimut) of achterkant van het paneel.",
+            },
+        ),
+    },
+}
+SIDES_T = {
+    "en": {"both": "Front and rear", "front": "Front only", "rear": "Rear only"},
+    "nl": {
+        "both": "Voor- en achterkant",
+        "front": "Alleen voorkant",
+        "rear": "Alleen achterkant",
     },
 }
 REASONS = {
@@ -261,6 +392,8 @@ REASONS = {
         "rain": "Heavy rain",
         "frost": "Frost",
         "calibrate": "Calibration",
+        "trigger": "Stow trigger",
+        "quiet": "Quiet hours",
     },
     "nl": {
         "strategy": "Strategie",
@@ -274,6 +407,8 @@ REASONS = {
         "rain": "Zware regen",
         "frost": "Vorst",
         "calibrate": "Kalibratie",
+        "trigger": "Stow-trigger",
+        "quiet": "Stille uren",
     },
 }
 STRATEGY = {
@@ -348,7 +483,16 @@ T = {
             "stow": (
                 "Stow",
                 "Move panels to their stow angle and keep them there until resumed.",
-                {"storm": ("Storm mode", "Also latch storm mode for the whole site.")},
+                {
+                    "storm": (
+                        "Storm mode",
+                        "Also latch storm mode for the whole site.",
+                    ),
+                    "duration": (
+                        "Duration",
+                        "Resume automatically after this time. Empty = until resumed.",
+                    ),
+                },
             ),
             "resume_auto": (
                 "Resume automatic",
@@ -434,7 +578,11 @@ T = {
                     "storm": (
                         "Stormmodus",
                         "Zet ook stormmodus aan voor de hele locatie.",
-                    )
+                    ),
+                    "duration": (
+                        "Duur",
+                        "Daarna automatisch hervatten. Leeg = tot je hervat.",
+                    ),
                 },
             ),
             "resume_auto": (
@@ -1017,6 +1165,15 @@ def build(lang: str) -> dict:
                     "description": t["opt_desc"],
                     "data": THRESH[lang],
                     "data_description": THRESH_DESC[lang],
+                    "sections": {
+                        key: {
+                            "name": name,
+                            "description": desc,
+                            "data": data,
+                            "data_description": help_,
+                        }
+                        for key, (name, desc, data, help_) in OPT_SECTIONS[lang].items()
+                    },
                 }
             },
             "error": ERRORS[lang],
@@ -1043,6 +1200,7 @@ def build(lang: str) -> dict:
             "mapping": {"options": t["selectors"]["mapping"]},
             "feedback_kind": {"options": t["selectors"]["feedback_kind"]},
             "mode": {"options": MODE[lang]},
+            "direction_sides": {"options": SIDES_T[lang]},
             **{k: {"options": v} for k, v in rt["selectors"].items()},
         },
         "services": {

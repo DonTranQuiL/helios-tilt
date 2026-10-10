@@ -28,6 +28,7 @@ SERVICE_CALIBRATE_TRAVEL = "calibrate_travel"
 
 ATTR_ANGLE = "angle"
 ATTR_STORM = "storm"
+ATTR_DURATION = "duration"
 ATTR_MODE = "mode"
 ATTR_ACTION = "action"
 ATTR_HOMING_SECONDS = "homing_seconds"
@@ -41,7 +42,11 @@ ANGLE_SCHEMA = vol.Schema(
     {**TARGET, vol.Required(ATTR_ANGLE): vol.All(vol.Coerce(float), vol.Range(-90, 90))}
 )
 STOW_SCHEMA = vol.Schema(
-    {**TARGET, vol.Optional(ATTR_STORM, default=False): cv.boolean}
+    {
+        **TARGET,
+        vol.Optional(ATTR_STORM, default=False): cv.boolean,
+        vol.Optional(ATTR_DURATION): vol.All(cv.time_period, cv.positive_timedelta),
+    }
 )
 RESUME_SCHEMA = vol.Schema(TARGET)
 MODE_SCHEMA = vol.Schema({**TARGET, vol.Required(ATTR_MODE): vol.In(MODES)})
@@ -147,7 +152,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
     async def stow(call: ServiceCall) -> None:
         for site, panels in resolve_panels(hass, call).items():
-            await site.async_stow(panels, call.data[ATTR_STORM])
+            await site.async_stow(
+                panels, call.data[ATTR_STORM], call.data.get(ATTR_DURATION) or None
+            )
 
     async def resume(call: ServiceCall) -> None:
         for site, panels in resolve_panels(hass, call).items():

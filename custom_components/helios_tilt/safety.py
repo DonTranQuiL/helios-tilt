@@ -2,7 +2,8 @@
 
 Pure state machine (no Home Assistant imports). Feed it a `Readings` every
 tick and on every relevant state change; it returns a `SafetyState`.
-Priority inside: storm > wind > no data > snow > rain > frost.
+Priority inside: storm > wind > custom stow trigger > no data > snow > rain >
+frost.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 # States, most to least severe.
 STORM = "storm"
 WIND = "wind"
+TRIGGER = "trigger"  # a custom stow trigger entity is on
 STARTUP = "startup"  # no valid data yet since start: don't move
 STALE = "stale"  # data went missing: freeze (unless already stowed)
 SNOW = "snow"
@@ -20,7 +22,7 @@ RAIN = "rain"
 FROST = "frost"
 OK = "ok"
 
-STOWING = (STORM, WIND)
+STOWING = (STORM, WIND, TRIGGER)
 # storm_until value meaning "until cleared by hand" (timezone-aware, so it
 # compares cleanly with real timestamps).
 UNTIL_CLEARED = datetime.max.replace(tzinfo=UTC)
@@ -56,6 +58,9 @@ class Readings:
     condition: str | None = None
     temperature: float | None = None  # degC
     cloud: float | None = None  # %
+    rain: bool | None = None  # dedicated rain sensor (None = use the condition)
+    snow: bool | None = None  # dedicated snow sensor (None = use the condition)
+    triggers: list[str] = field(default_factory=list)  # active stow triggers
 
 
 @dataclass(slots=True)
@@ -87,6 +92,7 @@ class SafetyEngine:
     last_wind: float | None = None
     had_valid_data: bool = False
     last: SafetyState = field(default_factory=lambda: SafetyState(STARTUP))
+    _wind_valid: bool = False
 
     # ---- commands --------------------------------------------------------
 
@@ -147,14 +153,24 @@ class SafetyEngine:
             if now >= self.storm_until:
                 self.storm_until = None
 
+        self._wind_valid = wind_valid
         self.last = self._state(now, readings, wind_valid)
         return self.last
 
-    def _state(self, now: datetime, r: Readings, wind_valid: bool) -> SafetyState:
+    def without_wind(self, now: datetime, readings: Readings) -> SafetyState:
+        """The state if the wind stow didn't apply (wind direction rule).
+
+        Storm mode still applies: above the storm speed every panel stows.
+        """
+        return self._state(now, readings, self._wind_valid, use_wind=False)
+
+    def _state(
+        self, now: datetime, r: Readings, wind_valid: bool, use_wind: bool = True
+    ) -> SafetyState:
         s = self.settings
         if self.storm:
             return SafetyState(STORM, self._wind_text())
-        if self.wind_stowed:
+        if self.wind_stowed and use_wind:
             if wind_valid and self.calm_since is not None:
                 left = timedelta(minutes=s.calm_minutes) - (now - self.calm_since)
                 return SafetyState(
@@ -162,15 +178,19 @@ class SafetyEngine:
                     f"{self._wind_text()}, calm for {max(0, int(left.total_seconds() // 60))} more min",
                 )
             return SafetyState(WIND, self._wind_text())
+        if r.triggers:
+            return SafetyState(TRIGGER, ", ".join(r.triggers))
         if s.wind_required and not wind_valid:
             if not self.had_valid_data:
                 return SafetyState(STARTUP, "waiting for wind data")
             return SafetyState(STALE, "wind data missing or stale")
         condition = (r.condition or "").lower()
-        if s.snow and condition in SNOW_CONDITIONS:
-            return SafetyState(SNOW, condition)
-        if s.rain and condition in HEAVY_RAIN_CONDITIONS:
-            return SafetyState(RAIN, condition)
+        snow = r.snow if r.snow is not None else condition in SNOW_CONDITIONS
+        if s.snow and snow:
+            return SafetyState(SNOW, "snow sensor" if r.snow else condition)
+        rain = r.rain if r.rain is not None else condition in HEAVY_RAIN_CONDITIONS
+        if s.rain and rain:
+            return SafetyState(RAIN, "rain sensor" if r.rain else condition)
         if (
             s.frost
             and r.temperature is not None

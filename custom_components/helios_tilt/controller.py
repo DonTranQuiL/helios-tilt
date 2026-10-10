@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, fields
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
@@ -13,6 +13,7 @@ from homeassistant.const import (
     ATTR_UNIT_OF_MEASUREMENT,
     EVENT_HOMEASSISTANT_STOP,
     EVENT_LOGBOOK_ENTRY,
+    STATE_ON,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
     UnitOfSpeed,
@@ -37,6 +38,10 @@ from .const import (
     CONF_CALM_MINUTES,
     CONF_CLOUD_THRESHOLD,
     CONF_DEADBAND,
+    CONF_DIRECTION_RULE,
+    CONF_DIRECTION_SECTOR,
+    CONF_DIRECTION_SENSOR,
+    CONF_DIRECTION_SIDES,
     CONF_FROST_MODE,
     CONF_FROST_TEMP,
     CONF_HYSTERESIS,
@@ -44,11 +49,21 @@ from .const import (
     CONF_LONGITUDE,
     CONF_MANUAL_PAUSE,
     CONF_MIN_INTERVAL,
+    CONF_QUIET_END,
+    CONF_QUIET_SAFETY,
+    CONF_QUIET_START,
     CONF_RAIN_MODE,
+    CONF_RAIN_SENSOR,
+    CONF_RAIN_THRESHOLD,
     CONF_SNOW_MODE,
+    CONF_SNOW_SENSOR,
+    CONF_SNOW_THRESHOLD,
     CONF_STALE_MINUTES,
     CONF_STORM_HOLD,
     CONF_STORM_SPEED,
+    CONF_TEMP_SENSOR,
+    CONF_TRIGGER_ANGLE,
+    CONF_TRIGGERS,
     CONF_WEATHER,
     CONF_WIND_RESUME,
     CONF_WIND_SENSOR,
@@ -66,12 +81,16 @@ from .const import (
     REASON_FROST,
     REASON_MANUAL,
     REASON_NIGHT,
+    REASON_QUIET,
     REASON_RAIN,
     REASON_SNOW,
     REASON_STORM,
     REASON_STOW,
     REASON_STRATEGY,
+    REASON_TRIGGER,
     REASON_WIND,
+    SIDES_FRONT,
+    SIDES_REAR,
     SITE_DEFAULTS,
     STORE_VERSION,
     STRATEGY_DAILY,
@@ -96,7 +115,9 @@ from .safety import (
     RAIN,
     SNOW,
     STORM,
+    TRIGGER,
     UNTIL_CLEARED,
+    WIND,
     Readings,
     SafetyEngine,
     SafetySettings,
@@ -121,7 +142,38 @@ REASON_TEXT = {
     REASON_RAIN: "Heavy rain",
     REASON_FROST: "Frost ({detail})",
     REASON_CALIBRATE: "Calibration",
+    REASON_TRIGGER: "Stow trigger ({detail})",
+    REASON_QUIET: "Quiet hours",
 }
+SAFETY_REASONS = (REASON_WIND, REASON_STORM, REASON_TRIGGER)
+CARDINALS = {
+    name: i * 22.5
+    for i, name in enumerate(
+        [
+            "N",
+            "NNE",
+            "NE",
+            "ENE",
+            "E",
+            "ESE",
+            "SE",
+            "SSE",
+            "S",
+            "SSW",
+            "SW",
+            "WSW",
+            "W",
+            "WNW",
+            "NW",
+            "NNW",
+        ]
+    )
+}
+RAIN_RATE_MM_H = {"mm/h": 1.0, "mm/d": 1 / 24, "in/h": 25.4, "in/d": 25.4 / 24}
+DEPTH_CM = {"cm": 1.0, "mm": 0.1, "m": 100.0, "in": 2.54, "ft": 30.48}
+SOURCE_WEATHER_WIND = "weather_wind"
+SOURCE_WEATHER_GUST = "weather_gust"
+SOURCE_SENSOR = "wind_sensor"
 STRATEGY_TEXT = {
     STRATEGY_FIXED: "Annual optimum",
     STRATEGY_SEASONAL: "Seasonal curve",
@@ -140,6 +192,48 @@ def _float(value: Any) -> float | None:
 
 def _usable(state: State | None) -> bool:
     return state is not None and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+
+
+def _bearing(value: Any) -> float | None:
+    """Degrees (0 = from the north) from a number or a cardinal like 'SW'."""
+    if (number := _float(value)) is not None:
+        return number % 360.0
+    if isinstance(value, str):
+        return CARDINALS.get(value.strip().upper())
+    return None
+
+
+def _angle_diff(a: float, b: float) -> float:
+    return abs((a - b + 180.0) % 360.0 - 180.0)
+
+
+def _parse_time(value: Any) -> time | None:
+    if isinstance(value, time):
+        return value
+    if not value:
+        return None
+    try:
+        return time.fromisoformat(str(value))
+    except ValueError:
+        LOGGER.warning("Invalid quiet hours time %s, ignoring it", value)
+        return None
+
+
+def in_window(now: time, start: time, end: time) -> bool:
+    """Is `now` in [start, end)? The window may cross midnight."""
+    if start == end:
+        return False
+    if start < end:
+        return start <= now < end
+    return now >= start or now < end
+
+
+def _converted(
+    value: float, unit: str | None, table: dict[str, float], default: str
+) -> float | None:
+    """Value in the table's base unit, or None for an unknown unit."""
+    factor = table.get((unit or default).strip().lower())
+    return None if factor is None else value * factor
 
 
 def _speed_kmh(value: Any, unit: str | None) -> float | None:
@@ -293,6 +387,7 @@ class Panel:
     auto_enabled: bool = True
     manual_angle: float | None = None
     stowed: bool = False
+    stowed_until: datetime | None = None
     commanded: float | None = None
     move_from: float | None = None
     move_started: datetime | None = None
@@ -321,6 +416,7 @@ class Panel:
     # diffuse, a freeze or automatic control off): only then does the
     # time until the next round count toward the gain.
     following_strategy: bool = False
+    wind_exempt: bool = False  # wind direction rule: this wind passes by
     pv_actual: float | None = None
     pv_model: float | None = None
     today_curve: list[tuple[str, float]] = field(default_factory=list)
@@ -367,6 +463,9 @@ class Panel:
             "auto_enabled": self.auto_enabled,
             "manual_angle": self.manual_angle,
             "stowed": self.stowed,
+            "stowed_until": self.stowed_until.isoformat()
+            if self.stowed_until
+            else None,
             "commanded": self.commanded,
             "estimate": self.current if self.current is not None else self.estimate,
             "moves_day": self.moves_day.isoformat() if self.moves_day else None,
@@ -384,6 +483,8 @@ class Panel:
         self.auto_enabled = bool(data.get("auto_enabled", True))
         self.manual_angle = _float(data.get("manual_angle"))
         self.stowed = bool(data.get("stowed", False))
+        until = data.get("stowed_until")
+        self.stowed_until = dt_util.parse_datetime(until) if until else None
         self.commanded = _float(data.get("commanded"))
         self.estimate = _float(data.get("estimate"))
         self.current = self.estimate
@@ -441,6 +542,30 @@ class HeliosSite:
         self.deadband = float(site[CONF_DEADBAND])
         self.hysteresis = float(site[CONF_HYSTERESIS])
         self.cloud_threshold = float(site[CONF_CLOUD_THRESHOLD])
+        # optional dedicated sources
+        self.rain_sensor: str | None = site.get(CONF_RAIN_SENSOR) or None
+        self.rain_threshold = float(site[CONF_RAIN_THRESHOLD])
+        self.snow_sensor: str | None = site.get(CONF_SNOW_SENSOR) or None
+        self.snow_threshold = float(site[CONF_SNOW_THRESHOLD])
+        self.temp_sensor: str | None = site.get(CONF_TEMP_SENSOR) or None
+        # custom stow triggers
+        self.triggers: list[str] = list(site.get(CONF_TRIGGERS) or [])
+        angle = site.get(CONF_TRIGGER_ANGLE)
+        self.trigger_angle = _float(angle) if angle not in (None, "") else None
+        # quiet hours
+        self.quiet_start = _parse_time(site.get(CONF_QUIET_START))
+        self.quiet_end = _parse_time(site.get(CONF_QUIET_END))
+        self.quiet_safety = bool(site[CONF_QUIET_SAFETY])
+        self.quiet = False
+        self.quiet_until: datetime | None = None
+        # wind direction rule
+        self.direction_rule = bool(site[CONF_DIRECTION_RULE])
+        self.direction_sensor: str | None = site.get(CONF_DIRECTION_SENSOR) or None
+        self.direction_sides: str = site[CONF_DIRECTION_SIDES]
+        self.direction_sector = float(site[CONF_DIRECTION_SECTOR])
+        self.bearing: float | None = None
+        # what the readings came from (transparency attributes)
+        self.sources: dict[str, Any] = {}
 
         self.panels: dict[str, Panel] = {}
         for subentry in entry.subentries.values():
@@ -514,7 +639,7 @@ class HeliosSite:
     @callback
     def async_activate(self) -> None:
         """Subscribe and start ticking (after the entities exist)."""
-        entities = {self.weather_entity, self.wind_sensor}
+        entities = {self.weather_entity, self.wind_sensor, *self._site_inputs()}
         for panel in self.panels.values():
             entities |= {
                 panel.cfg.actuator_entity,
@@ -789,10 +914,25 @@ class HeliosSite:
 
     # ---- inputs --------------------------------------------------------------
 
+    def _site_inputs(self) -> list[str]:
+        """Optional site entities that trigger a re-evaluation."""
+        return [
+            e
+            for e in (
+                self.rain_sensor,
+                self.snow_sensor,
+                self.temp_sensor,
+                self.direction_sensor,
+                *self.triggers,
+            )
+            if e
+        ]
+
     def _read_weather(self, now: datetime) -> Readings:
-        speeds: list[float] = []
+        speeds: dict[str, float] = {}
         ages: list[timedelta] = []
-        condition = temperature = cloud = None
+        condition = temperature = cloud = bearing = None
+        temp_source = bearing_source = None
         weather = (
             self.hass.states.get(self.weather_entity) if self.weather_entity else None
         )
@@ -800,9 +940,12 @@ class HeliosSite:
             assert weather is not None
             attrs = weather.attributes
             unit = attrs.get("wind_speed_unit")
-            for key in ("wind_speed", "wind_gust_speed"):
+            for key, source in (
+                ("wind_speed", SOURCE_WEATHER_WIND),
+                ("wind_gust_speed", SOURCE_WEATHER_GUST),
+            ):
                 if (speed := _speed_kmh(attrs.get(key), unit)) is not None:
-                    speeds.append(speed)
+                    speeds[source] = round(speed, 1)
             if speeds:
                 ages.append(max(timedelta(0), now - weather.last_reported))
             condition = weather.state
@@ -812,7 +955,10 @@ class HeliosSite:
                     attrs.get("temperature_unit") or UnitOfTemperature.CELSIUS,
                     UnitOfTemperature.CELSIUS,
                 )
+                temp_source = self.weather_entity
             cloud = _float(attrs.get("cloud_coverage"))
+            if (bearing := _bearing(attrs.get("wind_bearing"))) is not None:
+                bearing_source = self.weather_entity
         sensor = self.hass.states.get(self.wind_sensor) if self.wind_sensor else None
         if _usable(sensor):
             assert sensor is not None
@@ -821,15 +967,130 @@ class HeliosSite:
                     sensor.state, sensor.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
                 )
             ) is not None:
-                speeds.append(speed)
+                speeds[SOURCE_SENSOR] = round(speed, 1)
                 ages.append(max(timedelta(0), now - sensor.last_reported))
+        if self.direction_sensor:
+            state = self.hass.states.get(self.direction_sensor)
+            if _usable(state):
+                assert state is not None
+                if (value := _bearing(state.state)) is not None:
+                    bearing, bearing_source = value, self.direction_sensor
+        if self.temp_sensor:
+            state = self.hass.states.get(self.temp_sensor)
+            if _usable(state):
+                assert state is not None
+                if (value := self._temperature(state)) is not None:
+                    temperature, temp_source = value, self.temp_sensor
+        rain, rain_value = self._read_level(
+            self.rain_sensor, self.rain_threshold, RAIN_RATE_MM_H, "mm/h"
+        )
+        snow, snow_value = self._read_level(
+            self.snow_sensor, self.snow_threshold, DEPTH_CM, "cm"
+        )
+        triggers = []
+        for entity_id in self.triggers:
+            state = self.hass.states.get(entity_id)
+            if state is not None and state.state == STATE_ON:
+                triggers.append(state.name)
+        driving = max(speeds, key=lambda k: speeds[k]) if speeds else None
+        self.bearing = bearing
+        self.sources = {
+            "weather_entity": self.weather_entity,
+            "wind_sensor": self.wind_sensor,
+            "wind_source": driving,
+            "weather_wind": speeds.get(SOURCE_WEATHER_WIND),
+            "weather_gust": speeds.get(SOURCE_WEATHER_GUST),
+            "sensor_wind": speeds.get(SOURCE_SENSOR),
+            "wind_bearing": None if bearing is None else round(bearing, 1),
+            "wind_bearing_source": bearing_source,
+            "direction_rule": self.direction_rule,
+            "temperature": None if temperature is None else round(temperature, 1),
+            "temperature_source": temp_source,
+            "rain_sensor": self.rain_sensor,
+            "rain_sensor_value": rain_value,
+            "snow_sensor": self.snow_sensor,
+            "snow_sensor_value": snow_value,
+            "stow_triggers": list(self.triggers),
+            "active_triggers": triggers,
+        }
         return Readings(
-            wind=max(speeds) if speeds else None,
+            wind=speeds[driving] if driving else None,
             wind_age=min(ages) if ages else None,
             condition=condition,
             temperature=temperature,
             cloud=cloud,
+            rain=rain,
+            snow=snow,
+            triggers=triggers,
         )
+
+    def _temperature(self, state: State) -> float | None:
+        if (value := _float(state.state)) is None:
+            return None
+        try:
+            return TemperatureConverter.convert(
+                value,
+                state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+                or UnitOfTemperature.CELSIUS,
+                UnitOfTemperature.CELSIUS,
+            )
+        except Exception:  # unknown unit  # noqa: BLE001
+            LOGGER.warning("Unknown temperature unit on %s", state.entity_id)
+            return None
+
+    def _read_level(
+        self,
+        entity_id: str | None,
+        threshold: float,
+        table: dict[str, float],
+        default: str,
+    ) -> tuple[bool | None, Any]:
+        """(active, value) from an on/off or a numeric sensor; None = unknown."""
+        if not entity_id:
+            return None, None
+        state = self.hass.states.get(entity_id)
+        if not _usable(state):
+            return None, None
+        assert state is not None
+        if state.state in (STATE_ON, "off"):
+            return state.state == STATE_ON, state.state
+        if (value := _float(state.state)) is None:
+            return None, None
+        unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+        level = _converted(value, unit, table, default)
+        if level is None:
+            LOGGER.warning("Unknown unit %s on %s, ignoring it", unit, entity_id)
+            return None, None
+        return level >= threshold, f"{round(level, 2)} {default}"
+
+    def _wind_hits(self, panel: Panel) -> bool:
+        """Does the wind direction rule say this panel must stow?"""
+        if not self.direction_rule or self.bearing is None:
+            return True  # rule off or no direction: stow from any side
+        front = panel.cfg.azimuth
+        hit_front = _angle_diff(self.bearing, front) <= self.direction_sector
+        hit_rear = _angle_diff(self.bearing, front + 180.0) <= self.direction_sector
+        if self.direction_sides == SIDES_FRONT:
+            return hit_front
+        if self.direction_sides == SIDES_REAR:
+            return hit_rear
+        return hit_front or hit_rear
+
+    def _update_quiet(self, now: datetime) -> None:
+        start, end = self.quiet_start, self.quiet_end
+        self.quiet, self.quiet_until = False, None
+        if start is None or end is None:
+            return
+        local = dt_util.as_local(now)
+        if not in_window(local.time().replace(tzinfo=None), start, end):
+            return
+        self.quiet = True
+        until = local.replace(
+            hour=end.hour, minute=end.minute, second=end.second, microsecond=0
+        )
+        if until <= local:
+            until += timedelta(days=1)
+        self.quiet_until = until
 
     def _read_panel(self, panel: Panel, now: datetime) -> None:
         """Current angle, moving flag and PV power."""
@@ -901,7 +1162,11 @@ class HeliosSite:
         for panel in self.panels.values():
             if entity_id in (panel.cfg.actuator_entity, panel.cfg.feedback_entity):
                 self._detect_manual(panel, event, now)
-        if entity_id in (self.weather_entity, self.wind_sensor) or any(
+        if entity_id in (
+            self.weather_entity,
+            self.wind_sensor,
+            *self._site_inputs(),
+        ) or any(
             entity_id in (p.cfg.actuator_entity, p.cfg.feedback_entity)
             for p in self.panels.values()
         ):
@@ -1044,11 +1309,42 @@ class HeliosSite:
     ) -> tuple[float | None, str, str, bool]:
         """(target or None to hold, reason, detail, urgent)."""
         cfg, geo = panel.cfg, panel.geometry
+        panel.wind_exempt = False
+        if safety.state == WIND and not self._wind_hits(panel):
+            # wind direction rule: this wind comes from the side, no stow needed
+            panel.wind_exempt = True
+            safety = self.safety.without_wind(now, self.readings)
+        quiet_detail = (
+            f"until {dt_util.as_local(self.quiet_until):%H:%M}"
+            if self.quiet_until
+            else ""
+        )
+        # quiet hours may hold safety moves too (never storm mode)
+        if (
+            self.quiet
+            and not self.quiet_safety
+            and safety.state != STORM
+            and (safety.stow or safety.state in (SNOW, RAIN, FROST))
+            and not panel.stowed
+        ):
+            return None, REASON_QUIET, quiet_detail, False
         if safety.stow:
+            if safety.state == TRIGGER:
+                angle = (
+                    self.trigger_angle
+                    if self.trigger_angle is not None
+                    else cfg.stow_angle
+                )
+                return geo.clamp(angle), REASON_TRIGGER, safety.detail, True
             reason = REASON_STORM if safety.state == STORM else REASON_WIND
             return geo.clamp(cfg.stow_angle), reason, safety.detail, True
         if panel.stowed:
-            return geo.clamp(cfg.stow_angle), REASON_STOW, "", True
+            detail = (
+                f"until {dt_util.as_local(panel.stowed_until):%H:%M}"
+                if panel.stowed_until
+                else ""
+            )
+            return geo.clamp(cfg.stow_angle), REASON_STOW, detail, True
         if safety.frozen:
             return None, panel.target_reason, safety.detail, False
         if safety.state == SNOW:
@@ -1068,6 +1364,8 @@ class HeliosSite:
             return None, REASON_MANUAL, "paused after a manual move", False
         if not panel.auto_enabled:
             return None, panel.target_reason, "automatic control off", False
+        if self.quiet and not panel.user_pending:
+            return None, REASON_QUIET, quiet_detail, False
         raw, reason, detail = self._strategy_plan(panel, now)
         current = panel.commanded if panel.commanded is not None else None
         angle = geo.clamp(round_to_step(raw, cfg.step, current, self.hysteresis))
@@ -1106,6 +1404,7 @@ class HeliosSite:
         self.sun = sun_position(now, self.latitude, self.longitude)
         self.readings = self._read_weather(now)
         safety = self.safety.evaluate(now, self.readings)
+        self._update_quiet(now)
         await self._async_daily_plans(local.date())
         for panel in self.panels.values():
             self._read_panel(panel, now)
@@ -1113,6 +1412,8 @@ class HeliosSite:
             self._update_pv(panel)
             if panel.manual_until is not None and now >= panel.manual_until:
                 panel.manual_until = None
+            if panel.stowed_until is not None and now >= panel.stowed_until:
+                panel.stowed, panel.stowed_until = False, None
             target, reason, detail, urgent = self._decide(panel, safety, now)
             panel.target = (
                 target
@@ -1161,7 +1462,7 @@ class HeliosSite:
     ) -> None:
         driver = panel.driver
         if driver is not None and driver.calibrating:
-            if reason not in (REASON_WIND, REASON_STORM):
+            if reason not in SAFETY_REASONS:
                 return  # travel calibration owns the relays
             driver.async_calibration_cancel()  # wind and storm win: stow
         if driver is not None and (not driver.available or driver.backing_off(now)):
@@ -1490,10 +1791,17 @@ class HeliosSite:
         panel.auto_enabled = enabled
         await self.async_evaluate([panel])
 
-    async def async_stow(self, panels: list[Panel], storm: bool) -> None:
-        """Stow panels now; with storm=True also latch storm mode for the site."""
+    async def async_stow(
+        self, panels: list[Panel], storm: bool, duration: timedelta | None = None
+    ) -> None:
+        """Stow panels now; with storm=True also latch storm mode for the site.
+
+        With a duration the stow clears itself afterwards (else: until resumed).
+        """
+        until = dt_util.utcnow() + duration if duration else None
         for panel in panels:
             panel.stowed = True
+            panel.stowed_until = until
         if storm:
             self.safety.latch_storm(dt_util.utcnow())
         await self.async_evaluate()
@@ -1501,7 +1809,7 @@ class HeliosSite:
     async def async_resume(self, panels: list[Panel]) -> None:
         """Back to automatic: clears stow, manual mode, pause and the storm latch."""
         for panel in panels:
-            panel.stowed = False
+            panel.stowed, panel.stowed_until = False, None
             panel.manual_until = None
             if panel.mode == MODE_MANUAL:
                 panel.mode = MODE_AUTO
@@ -1540,6 +1848,13 @@ class HeliosSite:
                 "condition": self.readings.condition,
                 "temperature": self.readings.temperature,
                 "cloud": self.readings.cloud,
+                "rain": self.readings.rain,
+                "snow": self.readings.snow,
+            },
+            "sources": self.sources,
+            "quiet": {
+                "active": self.quiet,
+                "until": self.quiet_until.isoformat() if self.quiet_until else None,
             },
             "sun": None
             if self.sun is None

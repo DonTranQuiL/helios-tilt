@@ -161,6 +161,14 @@ async def test_card_in_browser(hass: HomeAssistant, setup_site, freezer) -> None
     assert c["enabled_after_error"] is True
     assert c["ghost"] == 1
     assert c["stowed_chip"] == "Stowed"
+    assert c["quiet_badge"] == "Quiet hours"
+    assert c["quiet_title"].startswith("Quiet hours until ")
+    assert c["quiet_chip"] == "Quiet hours"
+    assert c["no_quiet_badge"] == 0
+    assert c["trigger_chip"] == "Stow trigger"
+    assert c["trigger_detail"] == "Party mode"
+    assert c["trigger_stow_active"] is True
+    assert c["exempt_chip"] == "Tracking the sun"
     assert c["moon"] == 1
     assert c["night_sun"] == 0
     assert c["xss_nodes"] == 0

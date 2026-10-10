@@ -40,6 +40,9 @@ def _wind_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
         "safety": site.safety.last.state,
         "detail": site.safety.last.detail,
         "calm_minutes": s.calm_minutes,
+        # where the numbers come from
+        **site.sources,
+        "wind_exempt": panel.wind_exempt,
     }
 
 
@@ -54,7 +57,9 @@ BINARY_SENSORS: tuple[HeliosBinaryDescription, ...] = (
         key="wind_stow",
         translation_key="wind_stow",
         device_class=BinarySensorDeviceClass.SAFETY,
-        value_fn=lambda site, panel: site.safety.last.stow or panel.stowed,
+        value_fn=lambda site, panel: (
+            (site.safety.last.stow and not panel.wind_exempt) or panel.stowed
+        ),
     ),
 )
 

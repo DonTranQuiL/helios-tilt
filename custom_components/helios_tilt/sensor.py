@@ -23,11 +23,13 @@ from .const import (
     REASON_FROST,
     REASON_MANUAL,
     REASON_NIGHT,
+    REASON_QUIET,
     REASON_RAIN,
     REASON_SNOW,
     REASON_STORM,
     REASON_STOW,
     REASON_STRATEGY,
+    REASON_TRIGGER,
     REASON_WIND,
 )
 from .controller import HeliosSite, Panel
@@ -45,6 +47,8 @@ REASONS = [
     REASON_RAIN,
     REASON_FROST,
     REASON_CALIBRATE,
+    REASON_TRIGGER,
+    REASON_QUIET,
 ]
 
 
@@ -68,7 +72,13 @@ def _target_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
         "safety_detail": site.safety.last.detail,
         "auto": panel.auto_enabled,
         "stowed": panel.stowed,
+        "stowed_until": panel.stowed_until.isoformat() if panel.stowed_until else None,
         "paused_until": panel.manual_until.isoformat() if panel.manual_until else None,
+        "quiet": site.quiet,
+        "quiet_until": site.quiet_until.isoformat() if site.quiet_until else None,
+        "triggers": site.readings.triggers,
+        "wind_exempt": panel.wind_exempt,
+        "wind_bearing": site.sources.get("wind_bearing"),
         "min_angle": panel.cfg.min_angle,
         "max_angle": panel.cfg.max_angle,
         "stow_angle": panel.cfg.stow_angle,

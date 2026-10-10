@@ -14,7 +14,7 @@
         "data_description": {
           "latitude": "Defaults to your Home Assistant location.",
           "longitude": "Defaults to your Home Assistant location.",
-          "weather_entity": "Wind speed, gusts, condition (snow/rain), temperature and cloud cover.",
+          "weather_entity": "Wind speed, gusts, condition (snow/rain), temperature and cloud cover. Prefer a weather entity that reports gusts (e.g. Buienradar): gusts are what damage panels.",
           "wind_sensor": "Optional local anemometer. The highest of all wind readings is used."
         }
       },
@@ -179,7 +179,7 @@
         "data_description": {
           "latitude": "Defaults to your Home Assistant location.",
           "longitude": "Defaults to your Home Assistant location.",
-          "weather_entity": "Wind speed, gusts, condition (snow/rain), temperature and cloud cover.",
+          "weather_entity": "Wind speed, gusts, condition (snow/rain), temperature and cloud cover. Prefer a weather entity that reports gusts (e.g. Buienradar): gusts are what damage panels.",
           "wind_sensor": "Optional local anemometer. The highest of all wind readings is used."
         }
       }
@@ -193,6 +193,7 @@
       "actuator_in_use": "This actuator already drives another panel.",
       "resume_above_stow": "The resume speed must be below the stow speed.",
       "storm_below_stow": "The storm speed must be at least the stow speed.",
+      "quiet_incomplete": "Quiet hours need both a start and an end time.",
       "actuator_required": "Choose the actuator entity, or pick the two relays type.",
       "relays_required": "Choose both the open and the close relay.",
       "same_relay": "The open and close relay must be different switches.",
@@ -423,6 +424,7 @@
         "actuator_in_use": "This actuator already drives another panel.",
         "resume_above_stow": "The resume speed must be below the stow speed.",
         "storm_below_stow": "The storm speed must be at least the stow speed.",
+        "quiet_incomplete": "Quiet hours need both a start and an end time.",
         "actuator_required": "Choose the actuator entity, or pick the two relays type.",
         "relays_required": "Choose both the open and the close relay.",
         "same_relay": "The open and close relay must be different switches.",
@@ -471,6 +473,65 @@
           "min_move_interval": "Safety moves ignore this.",
           "deadband": "Smaller angle changes are skipped.",
           "hysteresis": "Extra margin before a rounded target changes step."
+        },
+        "sections": {
+          "sources": {
+            "name": "Dedicated sensors (optional)",
+            "description": "Override the weather entity with your own sensors.",
+            "data": {
+              "rain_sensor": "Rain sensor",
+              "rain_threshold": "Heavy rain from",
+              "snow_sensor": "Snow sensor",
+              "snow_threshold": "Snow from depth",
+              "temperature_sensor": "Outdoor temperature sensor"
+            },
+            "data_description": {
+              "rain_sensor": "A binary sensor (on = heavy rain) or a precipitation rate sensor (mm/h or in/h). Overrides the weather condition while it has a value.",
+              "rain_threshold": "For a rate sensor: heavy rain at or above this rate. Other units are converted.",
+              "snow_sensor": "A binary sensor (on = snow) or a snow depth sensor (cm, mm, m or in).",
+              "snow_threshold": "For a depth sensor: snow mode at or above this depth.",
+              "temperature_sensor": "Used for the frost threshold instead of the weather temperature. Fahrenheit is converted."
+            }
+          },
+          "triggers": {
+            "name": "Custom stow triggers (optional)",
+            "description": "Any entity that is on forces the stow position (safety priority).",
+            "data": {
+              "stow_triggers": "Trigger entities",
+              "trigger_angle": "Trigger stow angle"
+            },
+            "data_description": {
+              "stow_triggers": "Binary sensors, input booleans, switches... Stow while any of them is on.",
+              "trigger_angle": "Empty = each panel's own stow angle."
+            }
+          },
+          "quiet": {
+            "name": "Quiet hours (optional)",
+            "description": "No automatic moves in this window (may cross midnight).",
+            "data": {
+              "quiet_start": "Start",
+              "quiet_end": "End",
+              "quiet_allow_safety": "Allow safety moves in quiet hours"
+            },
+            "data_description": {
+              "quiet_allow_safety": "Off: wind, triggers, snow, rain and frost also wait for the end. Storm mode always moves."
+            }
+          },
+          "direction": {
+            "name": "Wind direction rule (optional)",
+            "description": "Only stow for wind from the front or rear of the panel.",
+            "data": {
+              "direction_rule": "Use the wind direction",
+              "direction_sensor": "Wind direction sensor",
+              "direction_sides": "Stow for wind from",
+              "direction_sector": "Sector width (plus/minus)"
+            },
+            "data_description": {
+              "direction_rule": "Wind from the side doesn't stow. Above the storm speed every panel stows regardless; without a direction every panel stows.",
+              "direction_sensor": "Degrees (0 = north) or N/NE/... Empty = the weather entity's wind bearing.",
+              "direction_sector": "Degrees around the panel's front (azimuth) or rear."
+            }
+          }
         }
       }
     },
@@ -483,6 +544,7 @@
       "actuator_in_use": "This actuator already drives another panel.",
       "resume_above_stow": "The resume speed must be below the stow speed.",
       "storm_below_stow": "The storm speed must be at least the stow speed.",
+      "quiet_incomplete": "Quiet hours need both a start and an end time.",
       "actuator_required": "Choose the actuator entity, or pick the two relays type.",
       "relays_required": "Choose both the open and the close relay.",
       "same_relay": "The open and close relay must be different switches.",
@@ -526,7 +588,9 @@
           "snow": "Snow",
           "rain": "Heavy rain",
           "frost": "Frost",
-          "calibrate": "Calibration"
+          "calibrate": "Calibration",
+          "trigger": "Stow trigger",
+          "quiet": "Quiet hours"
         }
       }
     },
@@ -619,6 +683,13 @@
         "tracking": "Sun tracking"
       }
     },
+    "direction_sides": {
+      "options": {
+        "both": "Front and rear",
+        "front": "Front only",
+        "rear": "Rear only"
+      }
+    },
     "actuator_type": {
       "options": {
         "entity": "Entity (cover, number or script)",
@@ -658,6 +729,10 @@
         "storm": {
           "name": "Storm mode",
           "description": "Also latch storm mode for the whole site."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Resume automatically after this time. Empty = until resumed."
         }
       }
     },

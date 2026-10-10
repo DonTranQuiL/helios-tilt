@@ -86,6 +86,49 @@ The **estimated gain** sensor compares today's modelled clear-sky energy at the 
 
 The config flow refuses a setup without a wind source.
 
+> [!TIP]
+> **Use a weather entity that reports gusts.** Gusts, not the average wind, are what bend mounts. Some weather entities (for example the weather of an alarm or security system) only report an average `wind_speed`. A provider with `wind_gust_speed`, such as **Buienradar** (Netherlands/Belgium), Met.no or a local anemometer, protects much better. The *Wind stow* and *Storm mode* sensors show where the wind numbers come from: `weather_entity`, `wind_sensor`, `weather_wind`, `weather_gust`, `sensor_wind`, and `wind_source` (the source that currently drives the value: `weather_wind`, `weather_gust` or `wind_sensor`). If `weather_gust` stays empty, your weather entity has no gusts.
+
+Priority: **safety** (storm, wind, custom stow triggers, snow, rain, frost) **> manual > automatic**.
+
+### Dedicated sensors (optional)
+
+Under **Configure → Dedicated sensors** you can replace parts of the weather entity with your own sensors. Each one overrides the weather while it has a value, and falls back to the weather condition when it is unavailable.
+
+| Sensor | Accepts | Notes |
+| --- | --- | --- |
+| Rain | a binary sensor (on = heavy rain), or a precipitation rate | Rates in mm/h, mm/d, in/h or in/d are converted to mm/h and compared with *Heavy rain from* (default 5 mm/h). Needs *Heavy rain position* on. |
+| Snow | a binary sensor (on = snow), or a snow depth | Depths in mm, cm, m, in or ft are converted to cm and compared with *Snow from depth* (default 1 cm). |
+| Outdoor temperature | a temperature sensor | Used for the frost threshold instead of the weather temperature; °F is converted. |
+
+A sensor with an unknown unit is ignored, with a warning in the log.
+
+### Custom stow triggers (optional)
+
+**Configure → Custom stow triggers**: pick any entities (binary sensors, input booleans, switches, …). While **any** of them is `on`, every panel goes to the *trigger stow angle* (or its own stow angle if you leave it empty), immediately and with safety priority. Manual mode waits. The reason shows the trigger's name, e.g. *Stow trigger (Hail warning)*, and the card shows **Stow trigger** with the name. When all triggers are off, the panels resume at once (no calm time).
+
+Examples: a hail warning from your weather service, an `input_boolean.window_cleaning`, a roof-access door sensor.
+
+For a one-off stow, the `helios_tilt.stow` action takes an optional `duration`: the panels resume by themselves afterwards.
+
+### Quiet hours (optional)
+
+**Configure → Quiet hours**: a start and an end time. The window may cross midnight (22:00–07:00 works). During quiet hours the strategy doesn't move the panels: they hold, the target sensor's `reason` is `quiet`, its `detail` says *until 07:00*, and the card shows a **Quiet hours** badge.
+
+- What you do yourself (set tilt, stow, resume) still moves.
+- *Allow safety moves in quiet hours* is **on** by default: wind, triggers, snow, rain and frost still move. Turn it off to hold those too. **Storm mode always moves**: above the storm speed the panels are protected regardless.
+
+### Wind direction rule (optional, off by default)
+
+Wind from the side hardly loads a tilted panel; wind on its face or underside does. With **Configure → Wind direction rule** on, a wind stow only happens when the wind comes **from** within ± *sector width* (default 60°) of the panel's front (its azimuth) or rear (azimuth + 180°). *Stow for wind from* chooses front, rear or both.
+
+- Direction comes from the weather entity's `wind_bearing`, or from a *wind direction sensor* (degrees, or N/NE/SSW…), which wins when it has a value.
+- **No direction known → every panel stows** (omnidirectional, as without the rule).
+- **Above the storm speed every panel stows**, whatever the direction.
+- An exempt panel still follows the other safety rules (snow, rain, frost). Its target sensor has `wind_exempt: true`.
+
+Example: a south-facing panel (azimuth 180°), both sides, ±60°: wind from 120°–240° (front) or 300°–60° (rear) stows; an east or west wind doesn't.
+
 ### Mechanical safety
 
 > [!CAUTION]
@@ -116,7 +159,7 @@ Copy `custom_components/helios_tilt` into your `config/custom_components/` folde
    2. Only that type's settings, plus the axis, azimuth, soft limits (min/max angle), step and strategy. For an entity, that's the entity and its mapping and feedback. For two relays, it's the open/close switch, the countdowns, the travel times and the angles at both ends; homing, timing and an optional stroke table are in a collapsed section.
    3. The positions (stow, night, diffuse, snow, rain, frost) and the seasonal winter/summer angles, plus the optional PV comparison. Every angle is kept between the soft limits: the defaults are clamped to them and the fields don't accept anything outside. The winter and summer angles are suggested from your latitude (about latitude + 15° and latitude − 35°, within the limits). If you set them equal, a note warns that the seasonal curve is flat; submit again to keep it.
 3. To add more panels: on the integration page, choose **⋮ → Add panel**. Each panel's **⋮ → Reconfigure** changes it later, in the same steps. Switching the actuator type there drops the old type's settings; a relay panel never uses an actuator entity.
-4. Under **Configure** on the site you'll find the thresholds: wind speeds, calm time, storm hold, stale-data time, weather positions, cloud threshold, minimum interval, manual pause, deadband and hysteresis. **Reconfigure** on the site changes the location and weather sources.
+4. Under **Configure** on the site you'll find the thresholds: wind speeds, calm time, storm hold, stale-data time, weather positions, cloud threshold, minimum interval, manual pause, deadband and hysteresis. Collapsed sections hold the optional extras: dedicated sensors, custom stow triggers, quiet hours and the wind direction rule (see [Safety](#safety)). **Reconfigure** on the site changes the location and weather sources.
 
 ### Actuator mapping
 
@@ -364,7 +407,7 @@ Target panels by entity or device; without a target, an action applies to every 
 | Action | Fields | What it does |
 | --- | --- | --- |
 | `helios_tilt.set_tilt` | `angle` | Manual mode at this angle (clamped to the limits) |
-| `helios_tilt.stow` | `storm` (optional) | Stow until resumed. With `storm: true`, also latch storm mode for the site |
+| `helios_tilt.stow` | `storm`, `duration` (optional) | Stow until resumed, or for `duration` (e.g. `"01:30:00"` or `{minutes: 90}`). With `storm: true`, also latch storm mode for the site |
 | `helios_tilt.resume_auto` | – | Clear stow, manual mode, the manual pause and storm mode |
 | `helios_tilt.set_mode` | `mode` | `auto`, `manual` or a strategy |
 | `helios_tilt.calibrate` | `angle` | Tell Helios the real angle without moving (needs a target) |
@@ -454,6 +497,9 @@ script:
 | "Paused after manual move" | Something moved the actuator without Helios: a manual move, a slow cover reporting odd positions, or a wrong mapping. Check the mapping and the travel time, or lower the manual pause. |
 | Repair "actuator did not reach its angle" | Power, end stops, or a travel time set too short. The notice clears when the panel arrives. |
 | Angles are mirrored | Swap *position at minimum/maximum angle*, or use a falling calibration table. |
+| Wind stow with little wind / no gusts shown | Look at the *Wind stow* sensor's attributes: `wind_source` says which reading drives it. An empty `weather_gust` means your weather entity has no gusts; consider Buienradar or an anemometer. |
+| Panels don't move in the evening | Quiet hours: the target's `reason` is `quiet`. |
+| No wind stow in a strong side wind | The wind direction rule is on and the target has `wind_exempt: true`. That's by design; storm speed always stows. |
 | Too many moves | Use a larger step, deadband or minimum interval, or the *daily* strategy. |
 | Card not showing | Hard-refresh the browser. The card URL carries a version hash, so new versions load by themselves. |
 

@@ -7,7 +7,7 @@ from typing import Final
 
 DOMAIN: Final = "helios_tilt"
 NAME: Final = "Helios Tilt"
-VERSION = "0.1.0b5"
+VERSION = "0.1.0b6"
 LOGGER = logging.getLogger(__package__)
 
 PLATFORMS: Final = ["binary_sensor", "button", "number", "select", "sensor", "switch"]
@@ -43,7 +43,36 @@ CONF_MANUAL_PAUSE: Final = "manual_pause"  # minutes
 CONF_DEADBAND: Final = "deadband"  # degrees
 CONF_HYSTERESIS: Final = "hysteresis"  # degrees
 
+# Optional dedicated sources (options).
+CONF_RAIN_SENSOR: Final = "rain_sensor"  # binary_sensor, or a rate in mm/h
+CONF_RAIN_THRESHOLD: Final = "rain_threshold"  # mm/h
+CONF_SNOW_SENSOR: Final = "snow_sensor"  # binary_sensor, or a snow depth
+CONF_SNOW_THRESHOLD: Final = "snow_threshold"  # cm
+CONF_TEMP_SENSOR: Final = "temperature_sensor"
+# Custom stow triggers (options).
+CONF_TRIGGERS: Final = "stow_triggers"
+CONF_TRIGGER_ANGLE: Final = "trigger_angle"  # unset = each panel's stow angle
+# Quiet hours (options).
+CONF_QUIET_START: Final = "quiet_start"
+CONF_QUIET_END: Final = "quiet_end"
+CONF_QUIET_SAFETY: Final = "quiet_allow_safety"
+# Wind direction rule (options).
+CONF_DIRECTION_RULE: Final = "direction_rule"
+CONF_DIRECTION_SENSOR: Final = "direction_sensor"
+CONF_DIRECTION_SIDES: Final = "direction_sides"
+CONF_DIRECTION_SECTOR: Final = "direction_sector"  # +- degrees
+SIDES_FRONT: Final = "front"
+SIDES_REAR: Final = "rear"
+SIDES_BOTH: Final = "both"
+SIDES: Final = [SIDES_BOTH, SIDES_FRONT, SIDES_REAR]
+
 SITE_DEFAULTS: Final = {
+    CONF_RAIN_THRESHOLD: 5.0,
+    CONF_SNOW_THRESHOLD: 1.0,
+    CONF_QUIET_SAFETY: True,
+    CONF_DIRECTION_RULE: False,
+    CONF_DIRECTION_SIDES: SIDES_BOTH,
+    CONF_DIRECTION_SECTOR: 60.0,
     CONF_WIND_STOW: 50.0,
     CONF_WIND_RESUME: 35.0,
     CONF_CALM_MINUTES: 10,
@@ -184,3 +213,5 @@ REASON_SNOW: Final = "snow"
 REASON_RAIN: Final = "rain"
 REASON_FROST: Final = "frost"
 REASON_CALIBRATE: Final = "calibrate"
+REASON_TRIGGER: Final = "trigger"
+REASON_QUIET: Final = "quiet"

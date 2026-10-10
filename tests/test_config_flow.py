@@ -333,6 +333,14 @@ async def test_options(hass: HomeAssistant, setup_site) -> None:
         "manual_pause": 30,
         "deadband": 1,
         "hysteresis": 0.5,
+        "sources": {"rain_threshold": 5, "snow_threshold": 1},
+        "triggers": {},
+        "quiet": {"quiet_allow_safety": True},
+        "direction": {
+            "direction_rule": False,
+            "direction_sides": "both",
+            "direction_sector": 60,
+        },
     }
     result = await hass.config_entries.options.async_configure(result["flow_id"], base)
     assert result["errors"] == {"wind_resume_speed": "resume_above_stow"}
@@ -348,6 +356,64 @@ async def test_options(hass: HomeAssistant, setup_site) -> None:
     site = entry.runtime_data
     assert site.safety.settings.wind_stow == 40
     assert site.safety.settings.rain is True
+
+
+async def test_options_extras(hass: HomeAssistant, setup_site) -> None:
+    """The optional sections are flattened, validated and applied."""
+    entry = await setup_site()
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    schema_keys = {str(k) for k in result["data_schema"].schema}
+    assert {"sources", "triggers", "quiet", "direction"} <= schema_keys
+    base = {
+        "wind_stow_speed": 40,
+        "wind_resume_speed": 30,
+        "calm_minutes": 5,
+        "storm_speed": 70,
+        "storm_hold_hours": 2,
+        "stale_minutes": 90,
+        "snow_mode": True,
+        "rain_mode": True,
+        "frost_mode": True,
+        "frost_temperature": 0,
+        "cloud_threshold": 70,
+        "min_move_interval": 2,
+        "manual_pause": 30,
+        "deadband": 1,
+        "hysteresis": 0.5,
+        "sources": {
+            "rain_sensor": "sensor.rain_rate",
+            "rain_threshold": 4,
+            "snow_threshold": 1,
+            "temperature_sensor": "sensor.outside",
+        },
+        "triggers": {"stow_triggers": ["input_boolean.party"], "trigger_angle": 20},
+        "quiet": {"quiet_start": "22:00:00", "quiet_allow_safety": False},
+        "direction": {
+            "direction_rule": True,
+            "direction_sides": "front",
+            "direction_sector": 45,
+        },
+    }
+    result = await hass.config_entries.options.async_configure(result["flow_id"], base)
+    assert result["errors"] == {"base": "quiet_incomplete"}
+    base["quiet"]["quiet_end"] = "07:00:00"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], base)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert "sources" not in entry.options
+    assert entry.options["rain_sensor"] == "sensor.rain_rate"
+    assert entry.options["stow_triggers"] == ["input_boolean.party"]
+    assert "snow_sensor" not in entry.options
+    await hass.async_block_till_done()
+    site = entry.runtime_data
+    assert site.rain_threshold == 4
+    assert site.temp_sensor == "sensor.outside"
+    assert site.triggers == ["input_boolean.party"]
+    assert site.trigger_angle == 20
+    assert str(site.quiet_start) == "22:00:00"
+    assert site.quiet_safety is False
+    assert site.direction_rule is True
+    assert site.direction_sides == "front"
+    assert site.direction_sector == 45
 
 
 async def test_reconfigure_site(hass: HomeAssistant, setup_site) -> None:
