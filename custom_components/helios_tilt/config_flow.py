@@ -18,6 +18,7 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_NAME, UnitOfSpeed
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import section
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .actuator import MappingError
@@ -857,18 +858,27 @@ class PanelSubentryFlow(PanelSteps, ConfigSubentryFlow):
             return self.async_abort(reason="not_loaded")
         site, panel = found
         default = round(panel.driver.cfg.max_run)
+        errors: dict[str, str] = {}
         if user_input is not None:
-            self._calibrating = True
-            site.async_travel_calibration(
-                panel, "start", user_input[ATTR_HOMING], autosave=False
-            )
-            return await self.async_step_travel_open()
+            try:
+                site.async_travel_calibration(
+                    panel, "start", user_input[ATTR_HOMING], autosave=False
+                )
+            except HomeAssistantError:
+                errors = {"base": "relays_unavailable"}
+            else:
+                self._calibrating = True
+                return await self.async_step_travel_open()
         return self.async_show_form(
             step_id="travel",
             data_schema=vol.Schema(
                 {vol.Required(ATTR_HOMING, default=default): _num(5, 300, 1, "s")}
             ),
-            description_placeholders={"panel": panel.title},
+            errors=errors,
+            description_placeholders={
+                "panel": panel.title,
+                "entities": ", ".join(panel.driver.unavailable) or "-",
+            },
         )
 
     async def _async_mark(

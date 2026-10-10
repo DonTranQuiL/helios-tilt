@@ -201,6 +201,7 @@
       "limits_outside_stroke": "The minimum and maximum angle must lie between the angles at fully closed and fully open.",
       "still_homing": "Still closing. Wait until it has closed fully and starts to open, then submit when it reaches the open end.",
       "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off.",
+      "relays_unavailable": "A relay is offline ({entities}). Check the Zigbee device (is it reachable in Zigbee2MQTT?) and try again.",
       "outside_limits": "Outside the soft limits ({min}° to {max}°). The panel never goes beyond a limit, so it would stop at the nearest one. Enter an angle within the limits.",
       "season_flat": "The winter and summer angles are equal, so the seasonal curve is flat. Suggested for latitude {latitude}°: winter {winter}°, summer {summer}°. Submit again to keep them equal."
     },
@@ -430,6 +431,7 @@
         "limits_outside_stroke": "The minimum and maximum angle must lie between the angles at fully closed and fully open.",
         "still_homing": "Still closing. Wait until it has closed fully and starts to open, then submit when it reaches the open end.",
         "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off.",
+        "relays_unavailable": "A relay is offline ({entities}). Check the Zigbee device (is it reachable in Zigbee2MQTT?) and try again.",
         "outside_limits": "Outside the soft limits ({min}° to {max}°). The panel never goes beyond a limit, so it would stop at the nearest one. Enter an angle within the limits.",
         "season_flat": "The winter and summer angles are equal, so the seasonal curve is flat. Suggested for latitude {latitude}°: winter {winter}°, summer {summer}°. Submit again to keep them equal."
       },
@@ -489,6 +491,7 @@
       "limits_outside_stroke": "The minimum and maximum angle must lie between the angles at fully closed and fully open.",
       "still_homing": "Still closing. Wait until it has closed fully and starts to open, then submit when it reaches the open end.",
       "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off.",
+      "relays_unavailable": "A relay is offline ({entities}). Check the Zigbee device (is it reachable in Zigbee2MQTT?) and try again.",
       "outside_limits": "Outside the soft limits ({min}° to {max}°). The panel never goes beyond a limit, so it would stop at the nearest one. Enter an angle within the limits.",
       "season_flat": "The winter and summer angles are equal, so the seasonal curve is flat. Suggested for latitude {latitude}°: winter {winter}°, summer {summer}°. Submit again to keep them equal."
     }
@@ -559,6 +562,9 @@
       },
       "position_uncertain": {
         "name": "Position uncertain"
+      },
+      "actuator_available": {
+        "name": "Actuator available"
       }
     },
     "button": {
@@ -708,6 +714,9 @@
     "not_a_panel": {
       "message": "{target} is not a Helios Tilt panel."
     },
+    "relays_unavailable": {
+      "message": "{panel}: relay offline ({entities}). Check the Zigbee device; Helios Tilt moves again by itself once it is back."
+    },
     "not_relays": {
       "message": "Choose a panel driven by two relays."
     }
@@ -720,6 +729,10 @@
     "relay_fault": {
       "title": "{panel}: relay problem",
       "description": "{fault}. Both relays were switched off and the position is marked uncertain; the next move homes first. Check the relay device, its Zigbee link and the wiring. This clears after the next successful move."
+    },
+    "relay_unavailable": {
+      "title": "{panel}: relay offline",
+      "description": "{entities} is unavailable, so Helios Tilt can't move this panel (Zigbee device offline?). Nothing is switched until it is back; then the panel goes to its current target by itself, and this notice clears. Check the device's power and its Zigbee link in Zigbee2MQTT."
     }
   }
 }

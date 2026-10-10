@@ -97,6 +97,8 @@ def _current_attrs(panel: Panel) -> dict[str, Any]:
             {
                 "estimated": True,
                 "position_uncertain": driver.uncertain,
+                "actuator_available": driver.available,
+                "unavailable_entities": list(driver.unavailable),
                 "stroke": None if position is None else round(position, 1),
                 "direction": {1: "opening", -1: "closing"}.get(driver.direction),
                 "calibration": None

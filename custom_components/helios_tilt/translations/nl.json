@@ -201,6 +201,7 @@
       "limits_outside_stroke": "De minimale en maximale hoek moeten tussen de hoeken bij volledig dicht en volledig open liggen.",
       "still_homing": "Nog aan het sluiten. Wacht tot hij helemaal dicht is en begint te openen, en bevestig als hij het open eind bereikt.",
       "calibration_failed": "De kalibratie is gestopt (een relais reageerde niet, of het duurde te lang). Beide relais zijn uit.",
+      "relays_unavailable": "Een relais is offline ({entities}). Controleer het Zigbee-apparaat (bereikbaar in Zigbee2MQTT?) en probeer het opnieuw.",
       "outside_limits": "Buiten de zachte grenzen ({min}° tot {max}°). Het paneel gaat nooit voorbij een grens en zou bij de dichtstbijzijnde stoppen. Vul een hoek binnen de grenzen in.",
       "season_flat": "De winter- en zomerhoek zijn gelijk, dus de seizoenscurve is vlak. Voorstel voor breedtegraad {latitude}°: winter {winter}°, zomer {summer}°. Bevestig opnieuw om ze gelijk te houden."
     },
@@ -430,6 +431,7 @@
         "limits_outside_stroke": "De minimale en maximale hoek moeten tussen de hoeken bij volledig dicht en volledig open liggen.",
         "still_homing": "Nog aan het sluiten. Wacht tot hij helemaal dicht is en begint te openen, en bevestig als hij het open eind bereikt.",
         "calibration_failed": "De kalibratie is gestopt (een relais reageerde niet, of het duurde te lang). Beide relais zijn uit.",
+        "relays_unavailable": "Een relais is offline ({entities}). Controleer het Zigbee-apparaat (bereikbaar in Zigbee2MQTT?) en probeer het opnieuw.",
         "outside_limits": "Buiten de zachte grenzen ({min}° tot {max}°). Het paneel gaat nooit voorbij een grens en zou bij de dichtstbijzijnde stoppen. Vul een hoek binnen de grenzen in.",
         "season_flat": "De winter- en zomerhoek zijn gelijk, dus de seizoenscurve is vlak. Voorstel voor breedtegraad {latitude}°: winter {winter}°, zomer {summer}°. Bevestig opnieuw om ze gelijk te houden."
       },
@@ -489,6 +491,7 @@
       "limits_outside_stroke": "De minimale en maximale hoek moeten tussen de hoeken bij volledig dicht en volledig open liggen.",
       "still_homing": "Nog aan het sluiten. Wacht tot hij helemaal dicht is en begint te openen, en bevestig als hij het open eind bereikt.",
       "calibration_failed": "De kalibratie is gestopt (een relais reageerde niet, of het duurde te lang). Beide relais zijn uit.",
+      "relays_unavailable": "Een relais is offline ({entities}). Controleer het Zigbee-apparaat (bereikbaar in Zigbee2MQTT?) en probeer het opnieuw.",
       "outside_limits": "Buiten de zachte grenzen ({min}° tot {max}°). Het paneel gaat nooit voorbij een grens en zou bij de dichtstbijzijnde stoppen. Vul een hoek binnen de grenzen in.",
       "season_flat": "De winter- en zomerhoek zijn gelijk, dus de seizoenscurve is vlak. Voorstel voor breedtegraad {latitude}°: winter {winter}°, zomer {summer}°. Bevestig opnieuw om ze gelijk te houden."
     }
@@ -559,6 +562,9 @@
       },
       "position_uncertain": {
         "name": "Positie onzeker"
+      },
+      "actuator_available": {
+        "name": "Actuator beschikbaar"
       }
     },
     "button": {
@@ -708,6 +714,9 @@
     "not_a_panel": {
       "message": "{target} is geen Helios Tilt-paneel."
     },
+    "relays_unavailable": {
+      "message": "{panel}: relais offline ({entities}). Controleer het Zigbee-apparaat; Helios Tilt beweegt vanzelf weer zodra het terug is."
+    },
     "not_relays": {
       "message": "Kies een paneel dat met twee relais wordt aangestuurd."
     }
@@ -720,6 +729,10 @@
     "relay_fault": {
       "title": "{panel}: probleem met een relais",
       "description": "{fault}. Beide relais zijn uitgeschakeld en de positie is als onzeker gemarkeerd; de volgende beweging homet eerst. Controleer het relaisapparaat, de Zigbee-verbinding en de bedrading. De melding verdwijnt na de volgende geslaagde beweging."
+    },
+    "relay_unavailable": {
+      "title": "{panel}: relais offline",
+      "description": "{entities} is niet beschikbaar, dus Helios Tilt kan dit paneel niet bewegen (Zigbee-apparaat offline?). Er wordt niets geschakeld tot het terug is; daarna gaat het paneel vanzelf naar zijn huidige doel en verdwijnt deze melding. Controleer de voeding van het apparaat en de Zigbee-verbinding in Zigbee2MQTT."
     }
   }
 }

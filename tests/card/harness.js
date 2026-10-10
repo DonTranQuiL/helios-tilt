@@ -142,6 +142,13 @@ async function click(card, selector) {
     c.relay_home_attention = rr.querySelector('button[data-action="home"]')?.classList.contains("attention");
     await click(relayCard, 'button[data-action="home"]');
     c.plain_est = root.querySelectorAll(".est, .badge-uncertain").length;
+    const offlineStates = clone(relayStates);
+    Object.assign(offlineStates[DATA.current].attributes, { actuator_available: false, unavailable_entities: ["switch.windowswitch_l1"] });
+    const offlineCard = await newCard({ entities: [DATA.target] }, makeHass(offlineStates));
+    c.offline_badge = offlineCard.shadowRoot.querySelector(".badge-offline")?.textContent;
+    c.offline_title = offlineCard.shadowRoot.querySelector(".badge-offline")?.getAttribute("title");
+    c.offline_home_disabled = offlineCard.shadowRoot.querySelector('button[data-action="home"]')?.disabled;
+    c.online_badge = rr.querySelectorAll(".badge-offline").length;
     const relayNl = await newCard({ entities: [DATA.target] }, makeHass(relayStates, false, { language: "nl" }));
     c.relay_nl = [relayNl.shadowRoot.querySelector(".est")?.textContent, relayNl.shadowRoot.querySelector('button[data-action="home"]')?.textContent];
 

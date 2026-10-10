@@ -68,6 +68,15 @@ UNCERTAIN = HeliosBinaryDescription(
 )
 
 
+AVAILABLE = HeliosBinaryDescription(
+    key="actuator_available",
+    translation_key="actuator_available",
+    device_class=BinarySensorDeviceClass.CONNECTIVITY,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda site, panel: bool(panel.driver and panel.driver.available),
+)
+
+
 def _relay_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
     driver = panel.driver
     assert driver is not None
@@ -79,6 +88,9 @@ def _relay_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
         "home_after_moves": driver.cfg.home_after_moves,
         "last_homed": driver.last_homed.isoformat() if driver.last_homed else None,
         "fault": driver.fault,
+        "actuator_available": driver.available,
+        "unavailable_entities": list(driver.unavailable),
+        "retry_after": driver.retry_after.isoformat() if driver.retry_after else None,
     }
 
 
@@ -93,6 +105,7 @@ async def async_setup_entry(
         entities = [HeliosBinarySensor(site, panel, d) for d in BINARY_SENSORS]
         if panel.driver is not None:
             entities.append(HeliosBinarySensor(site, panel, UNCERTAIN))
+            entities.append(HeliosBinarySensor(site, panel, AVAILABLE))
         async_add_entities(entities, config_subentry_id=panel.id)
 
 
@@ -109,6 +122,6 @@ class HeliosBinarySensor(HeliosEntity, BinarySensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Wind numbers for the card (relay numbers for position uncertain)."""
-        if self.entity_description.key == UNCERTAIN.key:
+        if self.entity_description.key in (UNCERTAIN.key, AVAILABLE.key):
             return _relay_attrs(self.site, self.panel)
         return _wind_attrs(self.site, self.panel)

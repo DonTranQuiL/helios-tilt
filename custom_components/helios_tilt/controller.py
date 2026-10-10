@@ -19,6 +19,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, State, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import (
@@ -478,6 +479,9 @@ class HeliosSite:
                 on_external=lambda direction: self._driver_external(panel, direction),
                 on_persist=self._save_now,
                 on_fault=lambda fault: self._driver_fault(panel, fault),
+                on_availability=lambda missing: self._driver_availability(
+                    panel, missing
+                ),
             )
         return panel
 
@@ -591,11 +595,25 @@ class HeliosSite:
 
     # ---- relay driver callbacks ---------------------------------------------------
 
+    def _require_relays(self, panel: Panel) -> None:
+        """Refuse a button or action while a relay is offline (shows a toast)."""
+        driver = panel.driver
+        if driver is not None and not driver.async_check_available():
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="relays_unavailable",
+                translation_placeholders={
+                    "panel": panel.title,
+                    "entities": ", ".join(driver.unavailable),
+                },
+            )
+
     @callback
     def async_home(self, panel: Panel) -> None:
         """Home now: into the end stop, then back to the current target."""
         if panel.driver is None:
             return
+        self._require_relays(panel)
         then = panel.target if panel.target is not None else panel.commanded
         position = None if then is None else panel.mapping.to_position(then)
         now = dt_util.utcnow()
@@ -623,6 +641,7 @@ class HeliosSite:
         if driver is None:
             return None
         if action == "start":
+            self._require_relays(panel)
             seconds = homing_seconds or driver.cfg.max_run
             driver.async_calibration_start(seconds)
             assert driver.calibration is not None
@@ -711,11 +730,37 @@ class HeliosSite:
         )
 
     @callback
+    def _driver_availability(self, panel: Panel, missing: list[str]) -> None:
+        """A relay or countdown went offline, or everything is back."""
+        issue_id = f"relay_unavailable_{panel.id}"
+        if missing:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.ERROR,
+                translation_key="relay_unavailable",
+                translation_placeholders={
+                    "panel": panel.title,
+                    "entities": ", ".join(missing),
+                },
+            )
+            self._notify()
+            return
+        ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+        panel.commanded = None  # send the current target again
+        panel.move_started = None
+        self.hass.async_create_task(self.async_evaluate(), eager_start=False)
+
+    @callback
     def _driver_fault(self, panel: Panel, fault: str | None) -> None:
         issue_id = f"relay_fault_{panel.id}"
         if fault is None:
             ir.async_delete_issue(self.hass, DOMAIN, issue_id)
             return
+        panel.commanded = None  # retry once the back-off has passed
+        panel.move_started = None
         ir.async_create_issue(
             self.hass,
             DOMAIN,
@@ -1119,6 +1164,8 @@ class HeliosSite:
             if reason not in (REASON_WIND, REASON_STORM):
                 return  # travel calibration owns the relays
             driver.async_calibration_cancel()  # wind and storm win: stow
+        if driver is not None and (not driver.available or driver.backing_off(now)):
+            return  # offline, or a recent fault: no attempts (no log spam)
         if panel.commanded is not None and abs(target - panel.commanded) < 0.5:
             panel.user_pending = False
             return
@@ -1242,7 +1289,9 @@ class HeliosSite:
 
     def _check_stuck(self, panel: Panel, now: datetime) -> None:
         if (
-            panel.move_started is None
+            panel.driver is not None  # relay panels report their own faults
+            or panel.current is None  # no reading (offline): can't judge
+            or panel.move_started is None
             or panel.commanded is None
             or panel.current_source == "estimate"
         ):

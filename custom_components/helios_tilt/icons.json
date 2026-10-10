@@ -77,6 +77,12 @@
         "state": {
           "off": "mdi:check-circle-outline"
         }
+      },
+      "actuator_available": {
+        "default": "mdi:lan-disconnect",
+        "state": {
+          "on": "mdi:lan-connect"
+        }
       }
     },
     "button": {

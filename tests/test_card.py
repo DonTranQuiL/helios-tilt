@@ -177,6 +177,10 @@ async def test_card_in_browser(hass: HomeAssistant, setup_site, freezer) -> None
     assert c["relay_home_attention"] is True
     assert ("home", {"entity_id": data["target"]}) in services
     assert c["plain_est"] == 0
+    assert c["offline_badge"] == "Relay offline"
+    assert c["offline_title"] == "Unavailable: switch.windowswitch_l1"
+    assert c["offline_home_disabled"] is True
+    assert c["online_badge"] == 0
     assert c["relay_nl"] == ["geschat", "Referentie"]
     assert c["nl_buttons"] == ["Auto", "Veilig", "Handmatig"]
     assert c["narrow_direction"] == "column"

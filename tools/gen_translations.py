@@ -642,7 +642,10 @@ TRAVEL = {
 }
 RELAY_T = {
     "en": {
-        "binary_sensor": {"position_uncertain": "Position uncertain"},
+        "binary_sensor": {
+            "position_uncertain": "Position uncertain",
+            "actuator_available": "Actuator available",
+        },
         "button": {
             "home": "Home now",
             "travel_start": "Travel calibration: start",
@@ -688,7 +691,10 @@ RELAY_T = {
         "fault_desc": "{fault}. Both relays were switched off and the position is marked uncertain; the next move homes first. Check the relay device, its Zigbee link and the wiring. This clears after the next successful move.",
     },
     "nl": {
-        "binary_sensor": {"position_uncertain": "Positie onzeker"},
+        "binary_sensor": {
+            "position_uncertain": "Positie onzeker",
+            "actuator_available": "Actuator beschikbaar",
+        },
         "button": {
             "home": "Nu homen",
             "travel_start": "Looptijd meten: start",
@@ -734,6 +740,23 @@ RELAY_T = {
         "fault_desc": "{fault}. Beide relais zijn uitgeschakeld en de positie is als onzeker gemarkeerd; de volgende beweging homet eerst. Controleer het relaisapparaat, de Zigbee-verbinding en de bedrading. De melding verdwijnt na de volgende geslaagde beweging.",
     },
 }
+OFFLINE = {
+    "en": {
+        "exception": "{panel}: relay offline ({entities}). Check the Zigbee device; Helios Tilt moves again by itself once it is back.",
+        "error": "A relay is offline ({entities}). Check the Zigbee device (is it reachable in Zigbee2MQTT?) and try again.",
+        "title": "{panel}: relay offline",
+        "desc": "{entities} is unavailable, so Helios Tilt can't move this panel (Zigbee device offline?). Nothing is switched until it is back; then the panel goes to its current target by itself, and this notice clears. Check the device's power and its Zigbee link in Zigbee2MQTT.",
+    },
+    "nl": {
+        "exception": "{panel}: relais offline ({entities}). Controleer het Zigbee-apparaat; Helios Tilt beweegt vanzelf weer zodra het terug is.",
+        "error": "Een relais is offline ({entities}). Controleer het Zigbee-apparaat (bereikbaar in Zigbee2MQTT?) en probeer het opnieuw.",
+        "title": "{panel}: relais offline",
+        "desc": "{entities} is niet beschikbaar, dus Helios Tilt kan dit paneel niet bewegen (Zigbee-apparaat offline?). Er wordt niets geschakeld tot het terug is; daarna gaat het paneel vanzelf naar zijn huidige doel en verdwijnt deze melding. Controleer de voeding van het apparaat en de Zigbee-verbinding in Zigbee2MQTT.",
+    },
+}
+for _lang in ("en", "nl"):
+    T[_lang]["exceptions"]["relays_unavailable"] = OFFLINE[_lang]["exception"]
+    ERRORS[_lang]["relays_unavailable"] = OFFLINE[_lang]["error"]
 for _lang in ("en", "nl"):
     T[_lang]["entities"]["binary_sensor"].update(RELAY_T[_lang]["binary_sensor"])
     T[_lang]["services"].update(RELAY_T[_lang]["services"])
@@ -1048,6 +1071,10 @@ def build(lang: str) -> dict:
             "relay_fault": {
                 "title": rt["fault_title"],
                 "description": rt["fault_desc"],
+            },
+            "relay_unavailable": {
+                "title": OFFLINE[lang]["title"],
+                "description": OFFLINE[lang]["desc"],
             },
         },
     }

@@ -1,7 +1,7 @@
 // Helios Tilt card: side view of each panel with the sun, wind gauge,
 // controls, today's angle plan and the last moves. Plain custom element, no
 // build step. Keep this file ASCII-only (use \u escapes).
-const VERSION = "0.1.0b4";
+const VERSION = "0.1.0b5";
 const DOMAIN = "helios_tilt";
 const DEG = "\u00b0";
 const DASH = "\u2013";
@@ -15,7 +15,7 @@ const I18N = {
     moves_today: "moves today", not_found: "No Helios Tilt panels found. Add the integration or pick a target angle sensor.",
     unavailable: "Unavailable", failed: "Action failed",
     estimated: "estimated", uncertain: "Position uncertain", home: "Home", home_title: "Drive into the end stop to re-learn the position",
-    moving_open: "opening", moving_close: "closing", calibrating: "Timing the travel",
+    moving_open: "opening", moving_close: "closing", calibrating: "Timing the travel", offline: "Relay offline", offline_title: "Unavailable: ",
     status: {
       storm: "Storm mode", wind: "Wind stow", stowed: "Stowed", manual: "Manual", paused: "Paused after manual move",
       off: "Auto off", startup: "Waiting for data", stale: "Holding: no wind data", night: "Night park",
@@ -38,7 +38,7 @@ const I18N = {
     moves_today: "bewegingen vandaag", not_found: "Geen Helios Tilt-panelen gevonden. Voeg de integratie toe of kies een doelhoeksensor.",
     unavailable: "Niet beschikbaar", failed: "Actie mislukt",
     estimated: "geschat", uncertain: "Positie onzeker", home: "Referentie", home_title: "Tot de eindstop rijden om de positie opnieuw te bepalen",
-    moving_open: "opent", moving_close: "sluit", calibrating: "Looptijd meten",
+    moving_open: "opent", moving_close: "sluit", calibrating: "Looptijd meten", offline: "Relais offline", offline_title: "Niet beschikbaar: ",
     status: {
       storm: "Stormmodus", wind: "Wind: veilige stand", stowed: "Veilige stand", manual: "Handmatig",
       paused: "Gepauzeerd na handmatige beweging", off: "Auto uit", startup: "Wacht op data",
@@ -395,6 +395,8 @@ class HeliosTiltCard extends HTMLElement {
     const uncertain = relays && cur.position_uncertain === true;
     const moving = cur.direction === "opening" ? t.moving_open : cur.direction === "closing" ? t.moving_close : "";
     const calibrating = relays && cur.calibration && cur.calibration.phase;
+    const offline = relays && cur.actuator_available === false;
+    const offlineList = Array.isArray(cur.unavailable_entities) ? cur.unavailable_entities.join(", ") : "";
     const detail = attrs.safety_detail || attrs.detail || "";
     const gainState = get("gain");
     const gain = num(gainState && gainState.state);
@@ -419,7 +421,7 @@ class HeliosTiltCard extends HTMLElement {
         <div class="name">${esc(name)}</div>
         <span class="chip ${cls}">${esc(label)}</span>
       </div>
-      ${uncertain || calibrating ? `<div class="badges">${uncertain ? `<span class="chip warn badge-uncertain">${esc(t.uncertain)}</span>` : ""}${calibrating ? `<span class="chip info">${esc(t.calibrating)}</span>` : ""}</div>` : ""}
+      ${offline || uncertain || calibrating ? `<div class="badges">${offline ? `<span class="chip bad badge-offline" title="${esc(t.offline_title + offlineList)}">${esc(t.offline)}</span>` : ""}${uncertain ? `<span class="chip warn badge-uncertain">${esc(t.uncertain)}</span>` : ""}${calibrating ? `<span class="chip info">${esc(t.calibrating)}</span>` : ""}</div>` : ""}
       <div class="hero">
         ${sideView(attrs, current, target, cls)}
         <div class="figures">
@@ -438,7 +440,7 @@ class HeliosTiltCard extends HTMLElement {
         <button data-action="auto" class="${active(!isManual && !isStow)}"${busy("auto")}>${esc(t.auto)}</button>
         <button data-action="stow" class="${active(isStow)}"${busy("stow")}>${esc(t.stow)}</button>
         <button data-action="manual" class="${active(isManual)}"${busy("manual")}>${esc(t.manual)}</button>
-        ${relays ? `<button data-action="home" class="${uncertain ? "attention" : ""}" title="${esc(t.home_title)}"${busy("home")}>${esc(t.home)}</button>` : ""}
+        ${relays ? `<button data-action="home" class="${uncertain ? "attention" : ""}" title="${esc(t.home_title)}"${offline ? " disabled" : busy("home")}>${esc(t.home)}</button>` : ""}
       </div>
       <label class="slider"><span>${esc(t.angle)}</span>
         <input type="range" min="${esc(lo)}" max="${esc(hi)}" step="1" value="${esc(sliderValue)}"${busy("tilt")}>

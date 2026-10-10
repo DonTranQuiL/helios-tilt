@@ -14,6 +14,8 @@ Safety rules, in order of importance:
   stops), and by a maximum continuous run time.
 * If a relay doesn't confirm a command, both relays are switched off and the
   position is marked uncertain.
+* Nothing is attempted while a relay (or a configured countdown) is
+  unavailable, e.g. a Zigbee device that is offline. Faults back off.
 
 The timing math is in plain functions at the top so it can be tested alone.
 """
@@ -24,10 +26,16 @@ import asyncio
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
-from homeassistant.const import ATTR_ENTITY_ID, STATE_OFF, STATE_ON
+from homeassistant.const import (
+    ATTR_ENTITY_ID,
+    STATE_OFF,
+    STATE_ON,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+)
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, State, callback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.util import dt as dt_util
@@ -42,10 +50,21 @@ CONFIRM_TIMEOUT = 5.0  # s for a relay to report the state we asked for
 COUNTDOWN_MARGIN = 2.0  # s added to the hardware countdown
 COUNTDOWN_MAX = 43200  # s, Tuya countdown limit
 CALIBRATION_MAX = 300.0  # s, longest a calibration run may take
+BACKOFF_FIRST = 60.0  # s before retrying after a fault, doubling each time
+BACKOFF_MAX = 1800.0
 
 
 class RelayFault(Exception):
     """A relay did not do what it was told."""
+
+
+class RelayUnavailable(RelayFault):
+    """A relay or countdown entity is unavailable (device offline?)."""
+
+    def __init__(self, entities: list[str]) -> None:
+        """Name the unavailable entities."""
+        super().__init__(", ".join(entities) + " unavailable")
+        self.entities = entities
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +195,7 @@ class RelayDriver:
         on_external: Callable[[int], None],
         on_persist: Callable[[], None],
         on_fault: Callable[[str | None], None],
+        on_availability: Callable[[list[str]], None] | None = None,
     ) -> None:
         """Set up; call async_start once Home Assistant runs."""
         self.hass = hass
@@ -185,6 +205,7 @@ class RelayDriver:
         self._on_external = on_external
         self._on_persist = on_persist
         self._on_fault = on_fault
+        self._on_availability = on_availability or (lambda _missing: None)
         # persisted
         self.position: float | None = None  # stroke %, 0 = closed
         self.uncertain = True
@@ -204,6 +225,9 @@ class RelayDriver:
         self._unsubs: list[CALLBACK_TYPE] = []
         self._cap_unsub: CALLBACK_TYPE | None = None
         self._mark: asyncio.Future[None] | None = None
+        self.unavailable: list[str] = []  # entities offline right now
+        self._fault_count = 0
+        self.retry_after: datetime | None = None  # back off after a fault
 
     # ---- persistence ------------------------------------------------------------
 
@@ -274,6 +298,69 @@ class RelayDriver:
         run = self._run or self._external
         return run.direction if run else 0
 
+    @property
+    def entities(self) -> list[str]:
+        """Every entity the driver uses."""
+        return [
+            e
+            for e in (
+                self.cfg.open_switch,
+                self.cfg.close_switch,
+                self.cfg.open_countdown,
+                self.cfg.close_countdown,
+            )
+            if e
+        ]
+
+    def missing(self) -> list[str]:
+        """Entities that can't be used now (offline, unknown, or not there)."""
+        out = []
+        for entity_id in self.entities:
+            state = self.hass.states.get(entity_id)
+            bad = (STATE_UNAVAILABLE,)
+            if entity_id in (self.cfg.open_switch, self.cfg.close_switch):
+                bad = (STATE_UNAVAILABLE, STATE_UNKNOWN)  # can't confirm a state
+            if state is None or state.state in bad:
+                out.append(entity_id)
+        return out
+
+    @property
+    def available(self) -> bool:
+        """Both relays (and the countdowns) can be used."""
+        return not self.unavailable
+
+    def backing_off(self, now: datetime | None = None) -> bool:
+        """A recent fault: automatic moves wait a while."""
+        return self.retry_after is not None and (now or dt_util.utcnow()) < (
+            self.retry_after
+        )
+
+    @callback
+    def async_check_available(self) -> bool:
+        """Re-read availability; tell the controller when it changed."""
+        missing = self.missing()
+        if missing != self.unavailable:
+            if missing:
+                for entity_id in missing:
+                    if entity_id not in self.unavailable:
+                        LOGGER.warning(
+                            "%s: relay %s is unavailable (Zigbee device offline?); "
+                            "no runs until it is back",
+                            self.name,
+                            entity_id,
+                        )
+            else:
+                LOGGER.info("%s: relays available again", self.name)
+                self.retry_after = None
+                self._fault_count = 0
+            self.unavailable = missing
+            self._on_availability(missing)
+        return not missing
+
+    def _require_available(self) -> None:
+        if not self.async_check_available():
+            raise RelayUnavailable(self.unavailable)
+
     def set_position(self, position: float) -> None:
         """The user says where it is (calibrate)."""
         self.position = max(0.0, min(100.0, position))
@@ -293,6 +380,14 @@ class RelayDriver:
                 self._async_relay_changed,  # type: ignore[arg-type]
             )
         )
+        self._unsubs.append(
+            async_track_state_change_event(
+                self.hass,
+                self.entities,
+                self._async_entity_changed,  # type: ignore[arg-type]
+            )
+        )
+        self.async_check_available()
         if self._is_on(self.cfg.open_switch) or self._is_on(self.cfg.close_switch):
             LOGGER.warning("%s: a relay was on at start; switching both off", self.name)
             self.uncertain = True
@@ -343,6 +438,7 @@ class RelayDriver:
 
     async def _async_go(self, target: float | None, home_first: bool) -> None:
         try:
+            self._require_available()
             if self._external is not None:
                 await self._async_stop_external()
             home = home_target(self.position, self.cfg)
@@ -354,15 +450,19 @@ class RelayDriver:
                 target = home  # the target is the home end: one homing run
             if target is not None:
                 await self._async_run(target)
-            if self.fault is not None:
-                self.fault = None
-                self._on_fault(None)
+            self._clear_fault()
+        except RelayUnavailable as err:
+            # Logged (once) by the availability check; nothing was switched on,
+            # unless it went offline mid-run.
+            if self._run is not None:
+                self._finish_run(dt_util.utcnow(), uncertain=True)
+                await self._async_all_off()
+            LOGGER.debug("%s: not moving: %s", self.name, err)
         except RelayFault as err:
             LOGGER.error("%s: %s; both relays switched off", self.name, err)
-            self.fault = str(err)
             self._finish_run(dt_util.utcnow(), uncertain=True)
             await self._async_all_off()
-            self._on_fault(self.fault)
+            self._set_fault(str(err))
         except asyncio.CancelledError:
             if self._run is not None:
                 self._finish_run(dt_util.utcnow(), uncertain=False)
@@ -371,6 +471,20 @@ class RelayDriver:
             raise
         finally:
             self._on_change()
+
+    def _set_fault(self, fault: str) -> None:
+        self.fault = fault
+        delay = min(BACKOFF_MAX, BACKOFF_FIRST * 2**self._fault_count)
+        self._fault_count += 1
+        self.retry_after = dt_util.utcnow() + timedelta(seconds=delay)
+        self._on_fault(fault)
+
+    def _clear_fault(self) -> None:
+        self._fault_count = 0
+        self.retry_after = None
+        if self.fault is not None:
+            self.fault = None
+            self._on_fault(None)
 
     async def _async_run(self, target: float) -> None:
         plan = plan_run(self.position, target, self.cfg)
@@ -470,6 +584,8 @@ class RelayDriver:
         except Exception as err:  # the switch's own error  # noqa: BLE001
             raise RelayFault(f"{entity_id} refused turn_{want}: {err}") from err
         if not await self._async_wait_state(entity_id, want):
+            if not self.async_check_available():
+                raise RelayUnavailable(self.unavailable)
             raise RelayFault(f"{entity_id} did not confirm {want}")
 
     async def _async_wait_state(self, entity_id: str, want: str) -> bool:
@@ -567,6 +683,24 @@ class RelayDriver:
             cancel()
 
     # ---- relays switched by someone else -------------------------------------------
+
+    @callback
+    def _async_entity_changed(self, event: Event) -> None:
+        """Availability of a relay or countdown changed?"""
+        was = self.available
+        now = self.async_check_available()
+        if was and not now and (self._run is not None or self.calibrating):
+            # Gone mid-run: stop (best effort) and distrust the estimate.
+            self._replace_task(self._async_offline_stop(), "offline")
+
+    async def _async_offline_stop(self) -> None:
+        if self._run is not None or self._external is not None:
+            self._finish_run(dt_util.utcnow(), uncertain=True)
+        self.calibration = None
+        self.uncertain = True
+        await self._async_all_off()
+        self._on_persist()
+        self._on_change()
 
     @callback
     def _async_relay_changed(self, event: Event) -> None:
@@ -713,6 +847,7 @@ class RelayDriver:
         cal = self.calibration
         assert cal is not None
         try:
+            self._require_available()
             if self._external is not None:
                 await self._async_stop_external()
             # 1. Home: close for the given time (past the end stop).
@@ -736,6 +871,13 @@ class RelayDriver:
             self.travel_since_home = 0.0
             self.last_homed = dt_util.utcnow()
             self._on_persist()
+        except RelayUnavailable as err:
+            LOGGER.warning("%s: calibration not possible: %s", self.name, err)
+            if self.calibration is cal:
+                self.calibration = None
+            if self._run is not None:
+                self.uncertain = True
+                await self._async_all_off()
         except RelayFault as err:
             LOGGER.error("%s: calibration stopped: %s", self.name, err)
             if self.calibration is cal:

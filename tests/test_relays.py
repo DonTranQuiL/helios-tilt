@@ -118,7 +118,8 @@ class FakeRelays:
             on = call.service == "turn_on"
             for entity_id in _ids(call):
                 self.log.append((self.now(), entity_id, "on" if on else "off"))
-                if entity_id not in self.ignore:
+                offline = hass.states.get(entity_id).state == "unavailable"
+                if entity_id not in self.ignore and not offline:
                     self.set(entity_id, on)
 
         async def _countdown(call: ServiceCall) -> None:
@@ -720,3 +721,183 @@ async def test_closing_the_travel_dialog_stops_the_relays(
     await run(hass, freezer, 0.5)
     assert not relays.on("relay.close") and not relays.on("relay.open")
     assert panel_of(entry).driver.calibration is None
+
+
+# ---- offline relays ------------------------------------------------------------------
+
+
+async def test_offline_relay_blocks_runs_and_recovers(
+    hass: HomeAssistant, relay_site, relays, freezer, caplog
+) -> None:
+    """Offline: no attempts, a repair and a sensor; back: it moves by itself."""
+    panel = panel_of(relay_site)
+    hass.states.async_set("relay.open", "unavailable")
+    await hass.async_block_till_done()
+    issues = ir.async_get(hass)
+    issue = issues.async_get_issue(DOMAIN, f"relay_unavailable_{panel.id}")
+    assert issue is not None
+    assert issue.translation_placeholders["entities"] == "relay.open"
+    assert "relay.open is unavailable (Zigbee device offline?)" in caplog.text
+    assert hass.states.get("binary_sensor.panel_1_actuator_available").state == "off"
+    attrs = hass.states.get(CURRENT).attributes
+    assert attrs["actuator_available"] is False
+    assert attrs["unavailable_entities"] == ["relay.open"]
+
+    relays.log.clear()
+    caplog.clear()
+    await hass.services.async_call(DOMAIN, "set_tilt", {"angle": 40}, blocking=True)
+    await run(hass, freezer, 600, step=5)
+    assert relays.log == []  # not a single attempt
+    assert "did not confirm" not in caplog.text
+    assert "did not reach" not in caplog.text
+    assert caplog.text.count("is unavailable") == 0  # logged once, earlier
+    assert issues.async_get_issue(DOMAIN, f"relay_fault_{panel.id}") is None
+
+    # Back online: the issue clears and the pending target is driven.
+    hass.states.async_set("relay.open", "off")
+    await hass.async_block_till_done()
+    assert issues.async_get_issue(DOMAIN, f"relay_unavailable_{panel.id}") is None
+    assert hass.states.get("binary_sensor.panel_1_actuator_available").state == "on"
+    await run(hass, freezer, 30, step=0.25)
+    assert ("relay.open", "on") in relays.sequence()
+    assert panel.driver.position == pytest.approx(100 * 40 / 60, abs=0.5)
+    _assert_interlock(relays)
+
+
+async def test_offline_countdown_also_blocks(
+    hass: HomeAssistant, relay_site, relays, freezer
+) -> None:
+    """A configured countdown that is offline counts as well."""
+    hass.states.async_set("countdown.close", "unavailable")
+    await hass.async_block_till_done()
+    assert not panel_of(relay_site).driver.available
+    relays.log.clear()
+    await hass.services.async_call(DOMAIN, "set_tilt", {"angle": 5}, blocking=True)
+    await run(hass, freezer, 60, step=1)
+    assert relays.log == []
+
+
+async def test_buttons_while_offline_raise_a_translated_error(
+    hass: HomeAssistant, relay_site, relays, freezer
+) -> None:
+    """Home now and calibration start tell the user (a toast), do nothing."""
+    from homeassistant.exceptions import HomeAssistantError
+
+    hass.states.async_set("relay.close", "unavailable")
+    await hass.async_block_till_done()
+    relays.log.clear()
+    with pytest.raises(HomeAssistantError) as err:
+        await hass.services.async_call(
+            "button", "press", {"entity_id": "button.panel_1_home_now"}, blocking=True
+        )
+    assert err.value.translation_key == "relays_unavailable"
+    assert err.value.translation_placeholders["entities"] == "relay.close"
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "button",
+            "press",
+            {"entity_id": "button.panel_1_travel_calibration_start"},
+            blocking=True,
+        )
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            DOMAIN,
+            "calibrate_travel",
+            {"entity_id": CURRENT, "action": "start"},
+            blocking=True,
+        )
+    await run(hass, freezer, 5)
+    assert relays.log == []
+    assert panel_of(relay_site).driver.calibration is None
+
+
+async def test_travel_dialog_while_offline_shows_an_error(
+    hass: HomeAssistant, relay_site, relays
+) -> None:
+    """The guided calibration stays on its first form with a clear error."""
+    hass.states.async_set("relay.open", "unavailable")
+    await hass.async_block_till_done()
+    sub = next(iter(relay_site.subentries.values()))
+    result = await relay_site.start_subentry_reconfigure_flow(hass, sub.subentry_id)
+    configure = hass.config_entries.subentries.async_configure
+    result = await configure(result["flow_id"], {"next_step_id": "travel"})
+    result = await configure(result["flow_id"], {"homing_seconds": 10})
+    assert result["step_id"] == "travel"
+    assert result["errors"] == {"base": "relays_unavailable"}
+    assert result["description_placeholders"]["entities"] == "relay.open"
+
+
+async def test_relay_going_offline_mid_run(
+    hass: HomeAssistant, relay_site, relays, freezer
+) -> None:
+    """Gone during a run: stop, mark uncertain, no fault spam, home when back."""
+    await hass.services.async_call(DOMAIN, "set_tilt", {"angle": 50}, blocking=True)
+    await run(hass, freezer, 3)
+    assert relays.on("relay.open")
+    hass.states.async_set("relay.close", "unavailable")
+    await run(hass, freezer, 2)
+    driver = panel_of(relay_site).driver
+    assert driver.uncertain
+    assert not relays.on("relay.open")
+    assert driver.fault is None
+    relays.log.clear()
+    await run(hass, freezer, 120, step=2)
+    assert relays.log == [], (relays.log, driver.fault, driver.unavailable)
+    hass.states.async_set("relay.close", "off")
+    await run(hass, freezer, 60, step=0.25)
+    seq = relays.sequence()
+    assert ("relay.close", "on") in seq  # homes first (uncertain)
+    assert not driver.uncertain
+    _assert_interlock(relays)
+
+
+async def test_already_off_counts_as_confirmed(
+    hass: HomeAssistant, relay_site, relays, freezer
+) -> None:
+    """The other relay is already off: no wait for a state change."""
+    relays.ignore.add("relay.close")  # a turn_off would never produce an event
+    relays.log.clear()
+    await hass.services.async_call(DOMAIN, "set_tilt", {"angle": 50}, blocking=True)
+    await run(hass, freezer, 2)
+    off = [t for t, a in relays.calls("relay.close") if a == "off"]
+    on = [t for t, a in relays.calls("relay.open") if a == "on"]
+    assert off and on
+    assert on[0] - off[0] < 1.5  # interlock pause only, not the 5 s timeout
+    assert panel_of(relay_site).driver.fault is None
+
+
+async def test_faults_back_off(
+    hass: HomeAssistant, setup_site, relays, freezer
+) -> None:
+    """A relay that never confirms is retried after 1, 2, 4... minutes."""
+    relays.ignore.add("relay.open")
+    entry = await setup_site(panels=[{**RELAY_PANEL}])
+    await run(hass, freezer, 30, step=0.5)
+    driver = panel_of(entry).driver
+    assert driver.fault is not None
+
+    def tries() -> int:
+        return sum(1 for _t, e, a in relays.log if (e, a) == ("relay.open", "on"))
+
+    first = tries()
+    await run(hass, freezer, 40, step=1)
+    assert tries() == first  # backing off
+    await run(hass, freezer, 60, step=1)
+    assert tries() == first + 1  # retried after the first back-off
+    await run(hass, freezer, 100, step=1)
+    assert tries() == first + 1  # now waiting 2 minutes
+
+
+async def test_no_stuck_warning_without_a_reading(
+    hass: HomeAssistant, setup_site, cover, freezer, caplog
+) -> None:
+    """An offline cover gives no 'did not reach ... (at None)' warning."""
+    entry = await setup_site()
+    hass.states.async_set("cover.panel", "unavailable")
+    await hass.services.async_call(DOMAIN, "set_tilt", {"angle": 40}, blocking=True)
+    await run(hass, freezer, 900, step=30)
+    assert "did not reach" not in caplog.text
+    panel = panel_of(entry)
+    assert (
+        ir.async_get(hass).async_get_issue(DOMAIN, f"actuator_stuck_{panel.id}") is None
+    )

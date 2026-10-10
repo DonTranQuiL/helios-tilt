@@ -149,6 +149,8 @@ Most linear actuators (and window openers) are "dumb": two wires and internal li
 - The estimate (stroke, uncertain flag, moves since homing) is saved, so a normal restart keeps it.
 - **Home now** (button, card or `helios_tilt.home`) does it right away.
 - Wind and storm stows still interrupt any run, including a homing run, and drive to the stow angle. On shutdown or unload both relays are switched off.
+- **Offline relays:** before every run or calibration, Helios checks that both relays (and the countdowns, if set) are available. If one is *unavailable*, for example because the Zigbee device is offline, it switches nothing. It logs `Relay switch.X is unavailable (Zigbee device offline?)` once, raises a repair notice, sets *Actuator available* to off and shows **Relay offline** on the card. When the device is back, the notice clears and the panel drives to its current target by itself. **Home now** and calibration start show an error message instead of doing nothing.
+- **Faults back off:** after a relay fault (e.g. no confirmation), automatic moves wait 1 minute, then 2, 4 … up to 30 minutes, instead of retrying every round.
 - Operating the relays yourself (the z2m frontend, the RF remote, a wall switch) is detected. Helios tracks the run in its estimate, caps it at the maximum run time, and pauses automatic control like any manual move. Switching a relay off during a Helios run stops the run there.
 
 > [!CAUTION]
@@ -348,6 +350,7 @@ One device per panel. Entity IDs follow the panel name, here `garden`:
 | `sensor.garden_moves_today` | Commanded moves today |
 | `sensor.garden_estimated_gain` | Modelled clear-sky energy today vs the fixed annual optimum, while following the strategy, in % (`instant_gain` for right now) |
 | `binary_sensor.garden_position_uncertain` | Two relays only: the estimate needs homing. Attributes: `stroke`, `moves_since_home`, `travel_since_home`, `last_homed`, `fault` |
+| `binary_sensor.garden_actuator_available` | Two relays only: off while a relay or countdown is unavailable (device offline). Attributes: `unavailable_entities`, `retry_after` |
 | `button.garden_home_now` | Two relays only: drive into the home end stop now |
 | `button.garden_travel_calibration_start` / `_end_reached` / `_cancel` | Two relays only (configuration): time the travel without the dialog |
 | `sensor.garden_pv_actual_vs_model` | Only with a PV power sensor and peak power: actual output as % of the clear-sky model |

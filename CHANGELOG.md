@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0-beta.5 (2026-10-10)
+
+- Two relays: before any run or calibration, both relays (and the countdowns, if set) must be available. While one is unavailable (Zigbee device offline), nothing is switched and nothing is retried. Helios logs `Relay switch.X is unavailable (Zigbee device offline?)` once and raises a *relay offline* repair. It all clears by itself when the device is back, and the panel then drives to its target.
+- New *Actuator available* binary sensor (connectivity). The current-angle sensor gets `actuator_available` / `unavailable_entities` attributes, and the card shows a **Relay offline** badge and disables Home.
+- **Home now**, calibration start (button or action) and the guided calibration show a clear, translated error while a relay is offline, instead of silently doing nothing.
+- A relay that goes offline mid-run stops the run, marks the position uncertain and homes after it is back, without counting as a fault.
+- Faults back off (1, 2, 4 … 30 minutes) instead of being retried every round.
+- A relay that is already off counts as confirmed off straight away (now covered by a test).
+- No more "did not reach … (at None)" warning when there is no position reading; relay panels report their own faults.
+
 ## 0.1.0-beta.4 (2026-10-10)
 
 - Panel setup in steps. Step 1 asks for the name and actuator type, step 2 for only that type's fields (entity + mapping, or the relays, countdowns, travel times and end angles) plus the geometry, and step 3 for the positions and PV. The generic *Actuator* field no longer appears for two-relay panels. Reconfigure uses the same steps, and switching the type drops the old type's settings.
