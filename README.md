@@ -22,6 +22,8 @@
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000?style=flat-square)](https://github.com/astral-sh/ruff)
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/qaHPTTKHae)
 [![Ko-fi](https://img.shields.io/badge/buy%20me%20a%20coffee-ko--fi-ff5e5b?style=flat-square&logo=kofi&logoColor=white)](https://ko-fi.com/DonTranQuiL)
+[![Liberapay patrons](https://img.shields.io/liberapay/patrons/Malosaaa.svg?logo=liberapay&style=flat-square)](https://liberapay.com/Malosaaa/donate)
+[![Liberapay goal](https://img.shields.io/liberapay/goal/Malosaaa.svg?logo=liberapay&style=flat-square)](https://liberapay.com/Malosaaa/donate)
 
 [Dumb actuators](#works-with-dumb-actuators-two-relays-timed) · [Calibration](#time-the-travel-required) · [ZG-2002-RF example](#example-tuya-zg-2002-rf-via-zigbee2mqtt) · [How the angle is chosen](#how-the-angle-is-chosen) · [Safety](#safety) · [Customization](#customization) · [Install](#installation) · [Entities](#entities) · [Card](#dashboard-card) · [FAQ](#faq) · [Docs site](https://dontranquil.github.io/helios-tilt/)
 
@@ -607,6 +609,15 @@ Diagnostics (**⋮ → Download diagnostics**) include the config and live state
 - Learning from PV output: adjusting the model with the actual-vs-model ratio.
 - Forecast-aware daily planning (cloudy day ahead → flatter).
 - Shading horizon per panel.
+
+## Support
+
+- Docs: [dontranquil.github.io/helios-tilt](https://dontranquil.github.io/helios-tilt/)
+- Issues: [GitHub Issues](https://github.com/DonTranQuiL/helios-tilt/issues)
+- Community: [Discord](https://discord.gg/qaHPTTKHae)
+- Tip jar: [Ko-fi](https://ko-fi.com/DonTranQuiL) · [Liberapay](https://liberapay.com/Malosaaa/donate)
+
+<a href="https://ko-fi.com/DonTranQuiL"><img alt="Support me on Ko-fi" src="https://ko-fi.com/img/githubbutton_sm.svg" height="30"></a> <a href="https://liberapay.com/Malosaaa/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a>
 
 ## Contributing
 
