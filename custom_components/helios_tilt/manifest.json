@@ -4,6 +4,9 @@
   "after_dependencies": [
     "frontend"
   ],
+  "categories": [
+    "energy.solar_batteries"
+  ],
   "codeowners": [
     "@DonTranQuiL"
   ],
