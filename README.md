@@ -10,7 +10,7 @@
 [![Open your Home Assistant instance and start setting up Helios Tilt.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=helios_tilt)
 
 [![GitHub release](https://img.shields.io/github/v/release/DonTranQuiL/helios-tilt?style=for-the-badge&color=ffb52e)](https://github.com/DonTranQuiL/helios-tilt/releases)
-[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white)](https://hacs.xyz)
+[![HACS](https://img.shields.io/badge/HACS-Default-41BDF5?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.4%2B-18BCF2?style=for-the-badge&logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
@@ -243,9 +243,18 @@ Example: a south-facing panel, both sides, ±60°: wind from 120°–240° or 30
 
 ### HACS (recommended)
 
-1. Click **Open in HACS** above, or add `https://github.com/DonTranQuiL/helios-tilt` as a custom repository (type *Integration*).
+Helios Tilt is in the **HACS default list**, so no custom repository is needed:
+
+1. Open **HACS** and search for **Helios Tilt** (or click **Open in HACS** above).
 2. Download **Helios Tilt** and restart Home Assistant.
 3. **Settings → Devices & services → Add integration → Helios Tilt.**
+
+<details>
+<summary>Fallback: add as a custom repository</summary>
+
+If Helios Tilt does not show up in the HACS search yet, go to HACS → ⋮ → **Custom repositories**, add `https://github.com/DonTranQuiL/helios-tilt` as type *Integration*, then continue with step 2.
+
+</details>
 
 ### Manual
 
