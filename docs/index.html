@@ -122,7 +122,7 @@
             <div>
                 <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Works with dumb actuators</h2>
                 <p class="text-slate-400 mb-6">Two cheap relays are enough. Tested on a real Tuya ZG-2002-RF dual relay (Zigbee2MQTT) driving an attic window opener.</p>
-                <p class="text-slate-400 mb-6 text-sm">Alternative: a single <span class="text-white font-semibold">AllbeAI TYZGM12-RF</span> controller (tested with a Vevor 3000N IP65 20" actuator) becomes a position-aware cover with the <a class="text-cyan-300 underline" href="https://github.com/DonTranQuiL/helios-tilt/blob/main/zigbee2mqtt/allbeai_tyzgm12_rf.mjs">Zigbee2MQTT external converter</a>; use Entity mode in Helios.</p>
+                <p class="text-slate-400 mb-6 text-sm">Alternative: a single <span class="text-white font-semibold">AllbeAI TYZGM12-RF</span> with the <a class="text-cyan-300 underline" href="https://github.com/DonTranQuiL/helios-tilt/blob/main/zigbee2mqtt/allbeai_tyzgm12_rf.mjs">Zigbee2MQTT external converter</a> (specially tuned for a Vevor 3000N IP65 20" actuator, ~100 s full stroke) becomes a position-aware cover; use Entity mode in Helios.</p>
                 <ul class="space-y-3 text-sm text-slate-300 list-disc list-inside">
                     <li><span class="text-white font-semibold">Time-based position</span> with separate open and close times.</li>
                     <li><span class="text-white font-semibold">Homing</span> against the actuator's limit switches: first move, after N moves, before the night park, or with Home now.</li>
