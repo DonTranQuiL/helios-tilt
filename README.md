@@ -26,7 +26,7 @@
 [![Liberapay patrons](https://img.shields.io/liberapay/patrons/Malosaaa.svg?logo=liberapay&style=flat-square)](https://liberapay.com/Malosaaa/donate)
 [![Liberapay goal](https://img.shields.io/liberapay/goal/Malosaaa.svg?logo=liberapay&style=flat-square)](https://liberapay.com/Malosaaa/donate)
 
-[Dumb actuators](#works-with-dumb-actuators-two-relays-timed) · [Calibration](#time-the-travel-required) · [ZG-2002-RF example](#example-tuya-zg-2002-rf-via-zigbee2mqtt)amp; · [AllbeAI TYZGM12-RF example](#example-allbeai-tyzgm12-rf--vevor-3000n-cover-via-zigbee2mqtt) · [How the angle is chosen](#how-the-angle-is-chosen) · [Safety](#safety) · [Customization](#customization) · [Install](#installation) · [Entities](#entities) · [Card](#dashboard-card) · [FAQ](#faq) · [Docs site](https://dontranquil.github.io/helios-tilt/)
+[Dumb actuators](#works-with-dumb-actuators-two-relays-timed) · [Calibration](#time-the-travel-required) · [ZG-2002-RF example](#example-tuya-zg-2002-rf-via-zigbee2mqtt) · [AllbeAI TYZGM12-RF example](#example-allbeai-tyzgm12-rf--vevor-3000n-cover-via-zigbee2mqtt) · [How the angle is chosen](#how-the-angle-is-chosen) · [Safety](#safety) · [Customization](#customization) · [Install](#installation) · [Entities](#entities) · [Card](#dashboard-card) · [FAQ](#faq) · [Docs site](https://dontranquil.github.io/helios-tilt/)
 
 </div>
 
