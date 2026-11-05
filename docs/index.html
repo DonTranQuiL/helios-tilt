@@ -57,7 +57,7 @@
             <h1 class="text-5xl md:text-7xl font-extrabold text-white tracking-tight mb-6">Follow the sun.<br>Stow before the storm.</h1>
             <p class="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">Helios Tilt works out where the sun is, picks the best angle for each panel and drives your linear actuator there. When the wind picks up, it stows the panels first.</p>
             <div class="flex flex-wrap items-center justify-center gap-4">
-                <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=DonTranQuiL&amp;repository=helios-tilt&amp;category=integration" class="px-6 py-3 rounded-full bg-amber-600 hover:bg-amber-500 text-white font-semibold inline-flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Open in HACS</a>
+                <a href="https://my.home-assistant.io/redirect/marketplace_repository/?owner=DonTranQuiL&amp;repository=helios-tilt&amp;category=integration" class="px-6 py-3 rounded-full bg-amber-600 hover:bg-amber-500 text-white font-semibold inline-flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Open in Marketplace</a>
                 <a href="https://github.com/DonTranQuiL/helios-tilt#try-it-without-hardware" class="px-6 py-3 rounded-full border border-cyan-500/50 text-cyan-200 hover:border-cyan-300">Try it without hardware</a>
                 <a href="https://github.com/DonTranQuiL/helios-tilt/releases" class="px-6 py-3 rounded-full border border-slate-600 text-slate-200 hover:border-slate-400">Releases</a>
             </div>
@@ -194,17 +194,29 @@ Close countdown  number.&lt;name&gt;_countdown_l2</code></pre>
         <div class="max-w-7xl mx-auto px-6">
             <div class="text-center mb-14">
                 <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Installation</h2>
-                <p class="text-slate-400">HACS, a restart, and a weather entity or wind sensor.</p>
+                <p class="text-slate-400">Marketplace (or HACS on older versions), then a weather entity or wind sensor.</p>
             </div>
             <div class="grid lg:grid-cols-2 gap-8">
-                <div class="rounded-2xl border border-slate-700/50 bg-slate-800/30 p-8">
-                    <h3 class="text-2xl font-bold text-white mb-6">HACS</h3>
-                    <ol class="space-y-4 text-sm text-slate-300">
-                        <li>1. Click <a class="text-amber-300 hover:underline" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=DonTranQuiL&amp;repository=helios-tilt&amp;category=integration">Open in HACS</a> and download Helios Tilt.</li>
-                        <li>2. Restart Home Assistant.</li>
-                        <li>3. Settings &rarr; Devices &amp; services &rarr; Add integration &rarr; Helios Tilt.</li>
-                        <li>4. Pick your weather entity, then the first panel's actuator, azimuth, limits and strategy. Two relays: time the travel. To add more panels, use &#8942; &rarr; Add panel.</li>
-                    </ol>
+                <div class="space-y-8">
+                    <div class="rounded-2xl border border-amber-500/40 bg-amber-900/10 p-8">
+                        <h3 class="text-2xl font-bold text-white mb-2">Marketplace</h3>
+                        <p class="text-sm text-slate-400 mb-6">Home Assistant 2026.11 and newer, recommended.</p>
+                        <ol class="space-y-4 text-sm text-slate-300">
+                            <li>1. Settings → Marketplace, then search for <strong class="text-white">Helios Tilt</strong>.</li>
+                            <li>2. Open it and click Install. Setup starts right away, no restart needed.</li>
+                        </ol>
+                        <a href="https://my.home-assistant.io/redirect/marketplace_repository/?owner=DonTranQuiL&amp;repository=helios-tilt&amp;category=integration" class="mt-6 px-5 py-2.5 rounded-full bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold inline-flex items-center gap-2">Open in Marketplace</a>
+                    </div>
+                    <div class="rounded-2xl border border-slate-700/50 bg-slate-800/30 p-8">
+                        <h3 class="text-2xl font-bold text-white mb-2">HACS</h3>
+                        <p class="text-sm text-slate-400 mb-6">Home Assistant before 2026.11.</p>
+                        <ol class="space-y-4 text-sm text-slate-300">
+                            <li>1. Helios Tilt is in the HACS default list: open HACS and search for Helios Tilt, or click <a class="text-amber-300 hover:underline" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=DonTranQuiL&amp;repository=helios-tilt&amp;category=integration">Open in HACS</a>, and download it.</li>
+                            <li>2. Restart Home Assistant.</li>
+                            <li>3. Settings &rarr; Devices &amp; services &rarr; Add integration &rarr; Helios Tilt.</li>
+                            <li>4. Pick your weather entity, then the first panel's actuator, azimuth, limits and strategy. Two relays: time the travel. To add more panels, use &#8942; &rarr; Add panel.</li>
+                        </ol>
+                    </div>
                 </div>
                 <div class="rounded-2xl border border-cyan-500/30 bg-cyan-900/10 p-8">
                     <h3 class="text-xl font-bold text-white mb-3">Dashboard card</h3>
