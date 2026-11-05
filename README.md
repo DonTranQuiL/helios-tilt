@@ -141,7 +141,7 @@ Then time the travel, press **Home now**, and add the card.
 
 ### Example: AllbeAI TYZGM12-RF + Vevor 3000N (cover via Zigbee2MQTT)
 
-An alternative to a dual-relay module: the **AllbeAI TYZGM12-RF** is a single Zigbee + RF open/close/stop motor controller. With the external converter below it becomes one Home Assistant cover with live opening/closing state and a 0–100 % position, so Helios uses it in **Entity** mode instead of *Two relays (timed)*. Tested with a **Vevor 3000N IP65 20"** linear actuator (full stroke ≈ 85 s).
+An alternative to a dual-relay module: the **AllbeAI TYZGM12-RF** is a single Zigbee + RF open/close/stop motor controller. The external converter below is **specially tuned** for a **Vevor 3000N IP65 20"** linear actuator (about **100 s** to fully open and fully close). It turns the AllbeAI into one Home Assistant cover with live opening/closing state and a 0–100 % position, so Helios uses it in **Entity** mode instead of *Two relays (timed)*.
 
 Out of the box Zigbee2MQTT mis-detects it as a generic Tuya `TS130F` curtain module (`_TZ32981000000_ei4vjkog`) with no usable status or position. Install the external converter [`zigbee2mqtt/allbeai_tyzgm12_rf.mjs`](zigbee2mqtt/allbeai_tyzgm12_rf.mjs):
 
@@ -154,12 +154,12 @@ Out of the box Zigbee2MQTT mis-detects it as a generic Tuya `TS130F` curtain mod
 | `cover.<name>` | Open / close / stop / set position, live `opening` / `closing` / `open` / `closed` |
 | `sensor.<name>_moving` | `UP`, `DOWN` or `STOP` |
 | `number.<name>_assumed_position` | Resync the tracked position without moving the motor |
-| `number.<name>_travel_time_open` | Seconds for a full open (default 85, 0.5 s steps) |
-| `number.<name>_travel_time_close` | Seconds for a full close (default 85) |
+| `number.<name>_travel_time_open` | Seconds for a full open (default 100, 0.5 s steps; tuned for Vevor 3000N 20") |
+| `number.<name>_travel_time_close` | Seconds for a full close (default 100; tuned for Vevor 3000N 20") |
 
 The converter times every move, ignores the device's bogus position reports, drives 3 s extra at 0 % / 100 % to seat on the limit switch, waits for Zigbee ACKs (one retry) and sends a safety stop 1 s after every stop. An `invert_motor` option is available.
 
-**Helios setup:** add a panel with actuator type **Entity (cover, number or script)** and pick the cover. Set **Full stroke travel time** to about 88–100 s: in Helios this is only the wait / stuck-check window, the motor timing stays in the Z2M travel-time numbers (~85 s). Leave **Feedback sensor** empty; the cover position is used.
+**Helios setup:** add a panel with actuator type **Entity (cover, number or script)** and pick the cover. Set **Full stroke travel time** to about 100–110 s: in Helios this is only the wait / stuck-check window; motor timing stays in the Z2M travel-time numbers (default **100 s**, tuned for the Vevor 3000N IP65 20"). Leave **Feedback sensor** empty; the cover position is used.
 
 **RF remote:** Zigbee never sees RF button presses. Resync with `assumed_position` or run a full open / close (always resyncs against the limit switch). Manual moves pause Helios automatic control for 60 minutes.
 

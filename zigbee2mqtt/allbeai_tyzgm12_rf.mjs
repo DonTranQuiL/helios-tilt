@@ -121,8 +121,8 @@ const tzTracked = {
             return {state: {[key]: v}};
         }
         const ms = meta.state ?? {};
-        const travelOpenMs = num(ms.travel_time_open ?? opts.travel_time_open, 85, 1, 600) * 1000;
-        const travelCloseMs = num(ms.travel_time_close ?? opts.travel_time_close, 85, 1, 600) * 1000;
+        const travelOpenMs = num(ms.travel_time_open ?? opts.travel_time_open, 100, 1, 600) * 1000;
+        const travelCloseMs = num(ms.travel_time_close ?? opts.travel_time_close, 100, 1, 600) * 1000;
         const tickMs = num(opts.update_interval, 2, 1, 30) * 1000;
         const invert = opts.invert_motor === true || opts.invert_motor === 'true';
 
@@ -198,9 +198,9 @@ export default {
         e.numeric('assumed_position', ea.STATE_SET).withValueMin(0).withValueMax(100).withUnit('%').withCategory('config')
             .withDescription('Override tracked position without moving the motor (e.g. set to 0 when physically closed)'),
         e.numeric('travel_time_open', ea.STATE_SET).withValueMin(1).withValueMax(600).withValueStep(0.5).withUnit('s').withCategory('config')
-            .withDescription('Seconds from fully closed (0%) to fully open (100%). Default 85.'),
+            .withDescription('Seconds from fully closed (0%) to fully open (100%). Default 100 (tuned for Vevor 3000N IP65 20").'),
         e.numeric('travel_time_close', ea.STATE_SET).withValueMin(1).withValueMax(600).withValueStep(0.5).withUnit('s').withCategory('config')
-            .withDescription('Seconds from fully open (100%) to fully closed (0%). Default 85.'),
+            .withDescription('Seconds from fully open (100%) to fully closed (0%). Default 100 (tuned for Vevor 3000N IP65 20").'),
     ],
     options: [
         e.numeric('update_interval', ea.SET).withValueMin(1).withValueMax(30).withUnit('s')
