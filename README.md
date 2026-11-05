@@ -6,6 +6,7 @@
 
 **Automatic tilt control for solar panels on linear actuators. Helios Tilt works out where the sun is, picks the best angle for each panel, and drives your actuator to it. When the wind picks up it stows the panels first.**
 
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=DonTranQuiL&repository=helios-tilt&category=integration)
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=DonTranQuiL&repository=helios-tilt&category=integration)
 [![Open your Home Assistant instance and start setting up Helios Tilt.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=helios_tilt)
 
@@ -241,7 +242,14 @@ Example: a south-facing panel, both sides, ±60°: wind from 120°–240° or 30
 
 ## Installation
 
-### HACS (recommended)
+### Marketplace (Home Assistant 2026.11 and newer, recommended)
+
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=DonTranQuiL&repository=helios-tilt&category=integration)
+
+1. In Home Assistant, go to **Settings > Marketplace** and search for **Helios Tilt** (or use the button above).
+2. Open it and select **Install**. The setup starts right away, no restart needed.
+
+### HACS (Home Assistant before 2026.11)
 
 Helios Tilt is in the **HACS default list**, so no custom repository is needed:
 
