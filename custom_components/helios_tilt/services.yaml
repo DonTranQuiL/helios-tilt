@@ -86,3 +86,12 @@ calibrate_travel:
           step: 1
           unit_of_measurement: s
           mode: box
+
+snow_remover:
+  target:
+    entity:
+      integration: helios_tilt
+  fields:
+    duration:
+      selector:
+        duration:

@@ -46,7 +46,34 @@ def _wind_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
     }
 
 
+def _frost_lock_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
+    guard = site.frost_guard
+    settings = guard.settings
+    return {
+        "enabled": settings.enabled,
+        "temperature": site.sources.get("temperature"),
+        "temperature_status": site.frost_temp_status,
+        "temperature_sensor": site.frost_temp_source,
+        "park_temperature": settings.park_temperature,
+        "unlock_temperature": settings.unlock_temperature,
+        "unlock_hold_minutes": settings.unlock_hold.total_seconds() / 60.0,
+        "allow_storm": settings.allow_storm,
+        "frost_guard_angle": site.frost_guard_angle,
+        "locked_since": guard.locked_since.isoformat() if guard.locked_since else None,
+        "above_since": guard.above_since.isoformat() if guard.above_since else None,
+        "unlock_eta": site.frost_guard_state.unlock_eta.isoformat()
+        if site.frost_guard_state.unlock_eta
+        else None,
+    }
+
+
 BINARY_SENSORS: tuple[HeliosBinaryDescription, ...] = (
+    HeliosBinaryDescription(
+        key="frost_lock",
+        translation_key="frost_lock",
+        device_class=BinarySensorDeviceClass.COLD,
+        value_fn=lambda site, panel: site.frost_guard.locked,
+    ),
     HeliosBinaryDescription(
         key="storm",
         translation_key="storm",
@@ -129,4 +156,6 @@ class HeliosBinarySensor(HeliosEntity, BinarySensorEntity):
         """Wind numbers for the card (relay numbers for position uncertain)."""
         if self.entity_description.key in (UNCERTAIN.key, AVAILABLE.key):
             return _relay_attrs(self.site, self.panel)
+        if self.entity_description.key == "frost_lock":
+            return _frost_lock_attrs(self.site, self.panel)
         return _wind_attrs(self.site, self.panel)

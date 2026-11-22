@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, fields
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -20,7 +21,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, State, callback
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import (
@@ -42,6 +43,12 @@ from .const import (
     CONF_DIRECTION_SECTOR,
     CONF_DIRECTION_SENSOR,
     CONF_DIRECTION_SIDES,
+    CONF_FROST_GUARD,
+    CONF_FROST_GUARD_ALLOW_STORM,
+    CONF_FROST_GUARD_ANGLE,
+    CONF_FROST_GUARD_PARK_TEMP,
+    CONF_FROST_GUARD_UNLOCK_HOLD,
+    CONF_FROST_GUARD_UNLOCK_TEMP,
     CONF_FROST_MODE,
     CONF_FROST_TEMP,
     CONF_HYSTERESIS,
@@ -56,6 +63,7 @@ from .const import (
     CONF_RAIN_SENSOR,
     CONF_RAIN_THRESHOLD,
     CONF_SNOW_MODE,
+    CONF_SNOW_REMOVER_HOLD,
     CONF_SNOW_SENSOR,
     CONF_SNOW_THRESHOLD,
     CONF_STALE_MINUTES,
@@ -69,7 +77,12 @@ from .const import (
     CONF_WIND_SENSOR,
     CONF_WIND_STOW,
     DOMAIN,
+    EVENT_FROST_LOCK,
+    EVENT_FROST_SENSOR,
+    EVENT_FROST_SENSOR_RECOVERED,
     EVENT_MOVE,
+    EVENT_SNOW_REMOVER,
+    EVENT_SNOW_REMOVER_REFUSED,
     FEEDBACK_ANGLE,
     LOGGER,
     MAPPING_TABLE,
@@ -79,11 +92,13 @@ from .const import (
     REASON_CALIBRATE,
     REASON_DIFFUSE,
     REASON_FROST,
+    REASON_FROST_LOCK,
     REASON_MANUAL,
     REASON_NIGHT,
     REASON_QUIET,
     REASON_RAIN,
     REASON_SNOW,
+    REASON_SNOW_REMOVER,
     REASON_STORM,
     REASON_STOW,
     REASON_STRATEGY,
@@ -98,6 +113,11 @@ from .const import (
     STRATEGY_SEASONAL,
     STRATEGY_TRACKING,
     SUBENTRY_PANEL,
+    TEMP_MISSING,
+    TEMP_OK,
+    TEMP_STALE,
+    TEMP_UNAVAILABLE,
+    TEMP_UNKNOWN,
     TICK_SECONDS,
 )
 from .engine import (
@@ -109,6 +129,7 @@ from .engine import (
     seasonal_angle,
     tracking_target,
 )
+from .frost_guard import FrostGuard, FrostGuardSettings, FrostGuardStatus
 from .relays import RelayConfig, RelayDriver
 from .safety import (
     FROST,
@@ -141,6 +162,8 @@ REASON_TEXT = {
     REASON_SNOW: "Snow: shedding angle",
     REASON_RAIN: "Heavy rain",
     REASON_FROST: "Frost ({detail})",
+    REASON_FROST_LOCK: "Frost lock",
+    REASON_SNOW_REMOVER: "Snow remover",
     REASON_CALIBRATE: "Calibration",
     REASON_TRIGGER: "Stow trigger ({detail})",
     REASON_QUIET: "Quiet hours",
@@ -396,6 +419,7 @@ class Panel:
     moves_today: int = 0
     history: list[Move] = field(default_factory=list)
     manual_until: datetime | None = None
+    snow_until: datetime | None = None  # snow remover hold
     # runtime
     target: float | None = None
     target_reason: str = REASON_STRATEGY
@@ -474,6 +498,7 @@ class Panel:
             "manual_until": self.manual_until.isoformat()
             if self.manual_until
             else None,
+            "snow_until": self.snow_until.isoformat() if self.snow_until else None,
             "relay": self.driver.store_data() if self.driver else None,
         }
 
@@ -505,6 +530,8 @@ class Panel:
                 )
         if until := data.get("manual_until"):
             self.manual_until = dt_util.parse_datetime(until)
+        if until := data.get("snow_until"):
+            self.snow_until = dt_util.parse_datetime(until)
         if self.driver is not None and (relay := data.get("relay")):
             self.driver.restore(relay)
 
@@ -548,6 +575,23 @@ class HeliosSite:
         self.snow_sensor: str | None = site.get(CONF_SNOW_SENSOR) or None
         self.snow_threshold = float(site[CONF_SNOW_THRESHOLD])
         self.temp_sensor: str | None = site.get(CONF_TEMP_SENSOR) or None
+        self.frost_guard = FrostGuard(
+            FrostGuardSettings(
+                enabled=bool(site[CONF_FROST_GUARD]),
+                park_temperature=float(site[CONF_FROST_GUARD_PARK_TEMP]),
+                unlock_temperature=float(site[CONF_FROST_GUARD_UNLOCK_TEMP]),
+                unlock_hold=timedelta(
+                    minutes=float(site[CONF_FROST_GUARD_UNLOCK_HOLD])
+                ),
+                allow_storm=bool(site[CONF_FROST_GUARD_ALLOW_STORM]),
+            )
+        )
+        self.frost_guard_angle = float(site[CONF_FROST_GUARD_ANGLE])
+        self.snow_remover_hold = timedelta(minutes=float(site[CONF_SNOW_REMOVER_HOLD]))
+        self.frost_guard_state = FrostGuardStatus()
+        self.frost_temp_status = TEMP_MISSING
+        self.frost_temp_source: str | None = None
+        self._last_temp_status: str | None = None
         # custom stow triggers
         self.triggers: list[str] = list(site.get(CONF_TRIGGERS) or [])
         angle = site.get(CONF_TRIGGER_ANGLE)
@@ -622,6 +666,8 @@ class HeliosSite:
             )
         self.safety.wind_stowed = bool(site.get("wind_stowed", False))
         self.safety.last_wind = _float(site.get("last_wind"))
+        if guard := site.get("frost_guard"):
+            self.frost_guard.restore(guard)
         for panel_id, data in stored.get("panels", {}).items():
             if panel := self.panels.get(panel_id):
                 panel.restore(data)
@@ -703,6 +749,7 @@ class HeliosSite:
                 else ("manual" if until == UNTIL_CLEARED else until.isoformat()),
                 "wind_stowed": self.safety.wind_stowed,
                 "last_wind": self.safety.last_wind,
+                "frost_guard": self.frost_guard.store_data(),
             },
             "panels": {pid: p.store_data() for pid, p in self.panels.items()},
         }
@@ -1319,6 +1366,26 @@ class HeliosSite:
             if self.quiet_until
             else ""
         )
+        # Frost guard: park once, then refuse every Helios move except
+        # optional storm stow. Quiet hours never hold this.
+        guard = self.frost_guard_state
+        frost_detail = self._frost_lock_detail()
+        if guard.should_park:
+            if safety.state == STORM and self.frost_guard.settings.allow_storm:
+                return geo.clamp(cfg.stow_angle), REASON_STORM, safety.detail, True
+            if safety.stow:
+                # Already in a wind/trigger stow: lock without leaving it.
+                return None, REASON_FROST_LOCK, frost_detail, False
+            return (
+                geo.clamp(self.frost_guard_angle),
+                REASON_FROST_LOCK,
+                frost_detail,
+                True,
+            )
+        if guard.locked:
+            if safety.state == STORM and self.frost_guard.settings.allow_storm:
+                return geo.clamp(cfg.stow_angle), REASON_STORM, safety.detail, True
+            return None, REASON_FROST_LOCK, frost_detail, False
         # quiet hours may hold safety moves too (never storm mode)
         if (
             self.quiet
@@ -1353,6 +1420,14 @@ class HeliosSite:
             return geo.clamp(cfg.rain_angle), REASON_RAIN, safety.detail, False
         if safety.state == FROST:
             return geo.clamp(cfg.frost_angle), REASON_FROST, safety.detail, False
+        if panel.snow_until is not None and now < panel.snow_until:
+            until = dt_util.as_local(panel.snow_until).strftime("%H:%M")
+            return (
+                geo.clamp(cfg.max_angle),
+                REASON_SNOW_REMOVER,
+                f"until {until}",
+                False,
+            )
         if panel.mode == MODE_MANUAL:
             angle = (
                 panel.manual_angle if panel.manual_angle is not None else panel.current
@@ -1405,6 +1480,10 @@ class HeliosSite:
         self.sun = sun_position(now, self.latitude, self.longitude)
         self.readings = self._read_weather(now)
         safety = self.safety.evaluate(now, self.readings)
+        prev_locked = self.frost_guard.locked
+        prev_temp_status = self._last_temp_status
+        self._update_frost_guard(now)
+        self._announce_frost(now, prev_locked, prev_temp_status)
         self._update_quiet(now)
         await self._async_daily_plans(local.date())
         for panel in self.panels.values():
@@ -1415,6 +1494,10 @@ class HeliosSite:
                 panel.manual_until = None
             if panel.stowed_until is not None and now >= panel.stowed_until:
                 panel.stowed, panel.stowed_until = False, None
+            if panel.snow_until is not None and now >= panel.snow_until:
+                panel.snow_until = None
+            if self.frost_guard.locked and panel.snow_until is not None:
+                panel.snow_until = None
             target, reason, detail, urgent = self._decide(panel, safety, now)
             panel.target = (
                 target
@@ -1792,6 +1875,66 @@ class HeliosSite:
         panel.auto_enabled = enabled
         await self.async_evaluate([panel])
 
+    async def async_snow_remover(
+        self, panel: Panel, duration: timedelta | None = None
+    ) -> None:
+        """Tilt to max_angle so snow can slide off, then resume after a hold.
+
+        Refused when the frost guard is locked, the temperature is at or
+        below the park threshold, the temperature reading is unusable, or
+        a wind/storm stow is already active.
+        """
+        now = dt_util.utcnow()
+        temp, status, source = self._frost_temp_status(now)
+        reason = None
+        if self.frost_guard.locked:
+            reason = "frost_lock"
+        elif status != TEMP_OK:
+            reason = f"temperature_{status}"
+        elif temp is not None and temp <= self.frost_guard.settings.park_temperature:
+            reason = "at_or_below_park_temp"
+        elif (
+            self.safety.last.state == STORM
+            or self.safety.last.state == TRIGGER
+            or (
+                self.safety.last.state == WIND
+                and self.safety.last.stow
+                and not panel.wind_exempt
+            )
+        ):
+            # Wind/storm/trigger stow has priority: do not leave the stow.
+            reason = self.safety.last.state
+        if reason:
+            self._announce_snow_remover_refused(panel, reason, temp, status, source)
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="snow_remover_refused",
+                translation_placeholders={
+                    "panel": panel.title,
+                    "reason": reason,
+                },
+            )
+        hold = duration or self.snow_remover_hold
+        panel.snow_until = now + hold
+        until = dt_util.as_local(panel.snow_until).strftime("%H:%M")
+        self.hass.bus.async_fire(
+            EVENT_SNOW_REMOVER,
+            {
+                "action": "started",
+                "panel": panel.title,
+                "angle": panel.cfg.max_angle,
+                "until": panel.snow_until.isoformat(),
+                "temperature": None if temp is None else round(temp, 1),
+            },
+        )
+        LOGGER.info(
+            "%s snow remover: %s deg until %s",
+            panel.title,
+            panel.cfg.max_angle,
+            until,
+        )
+        await self.async_evaluate([panel])
+
     async def async_stow(
         self, panels: list[Panel], storm: bool, duration: timedelta | None = None
     ) -> None:
@@ -1812,6 +1955,7 @@ class HeliosSite:
         for panel in panels:
             panel.stowed, panel.stowed_until = False, None
             panel.manual_until = None
+            panel.snow_until = None
             if panel.mode == MODE_MANUAL:
                 panel.mode = MODE_AUTO
             panel.auto_enabled = True
@@ -1831,6 +1975,226 @@ class HeliosSite:
         self._save()
         self._notify()
 
+    # ---- frost guard ---------------------------------------------------------
+
+    def _frost_temp_status(self, now: datetime) -> tuple[float | None, str, str | None]:
+        """(celsius or None, status, source entity)."""
+        entity_id = self.temp_sensor or self.weather_entity
+        if not entity_id:
+            return None, TEMP_MISSING, None
+        state = self.hass.states.get(entity_id)
+        if state is None or state.state == STATE_UNAVAILABLE:
+            return None, TEMP_UNAVAILABLE, entity_id
+        if state.state in (STATE_UNKNOWN, "", "none", "None"):
+            return None, TEMP_UNKNOWN, entity_id
+        reported = state.last_reported or state.last_updated
+        if reported is not None:
+            try:
+                age = now - dt_util.as_utc(reported)
+            except (TypeError, ValueError):
+                age = timedelta(0)
+            stale_after = timedelta(minutes=self.safety.settings.stale_minutes)
+            if age > stale_after:
+                temp = (
+                    self._temperature(state)
+                    if entity_id == self.temp_sensor
+                    else self._weather_temperature(state)
+                )
+                return temp, TEMP_STALE, entity_id
+        if entity_id == self.temp_sensor:
+            temp = self._temperature(state)
+        else:
+            temp = self._weather_temperature(state)
+        if temp is None:
+            return None, TEMP_UNKNOWN, entity_id
+        return temp, TEMP_OK, entity_id
+
+    def _weather_temperature(self, state: State) -> float | None:
+        """Temperature attribute of a weather entity, in Celsius."""
+        if (value := _float(state.attributes.get("temperature"))) is None:
+            return None
+        try:
+            return TemperatureConverter.convert(
+                value,
+                state.attributes.get("temperature_unit") or UnitOfTemperature.CELSIUS,
+                UnitOfTemperature.CELSIUS,
+            )
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _update_frost_guard(self, now: datetime) -> None:
+        """Read the temperature and advance the frost-guard state machine."""
+        temp, status, source = self._frost_temp_status(now)
+        self.frost_temp_status = status
+        self.frost_temp_source = source
+        # Usable readings only drive park/unlock; anything else is None.
+        usable = temp if status == TEMP_OK else None
+        was_locked = self.frost_guard.locked
+        self.frost_guard_state = self.frost_guard.evaluate(now, usable)
+        if self.frost_guard.locked != was_locked or self.frost_guard_state.should_park:
+            self._save_now()
+
+    def _frost_lock_detail(self) -> str:
+        temp = self.sources.get("temperature")
+        if self.frost_temp_status != TEMP_OK:
+            return f"sensor {self.frost_temp_status}"
+        if temp is None:
+            return ""
+        return f"{temp:g} °C"
+
+    def _notify_id(self, suffix: str) -> str:
+        return f"{DOMAIN}_{suffix}_{self.entry.entry_id}"
+
+    def _create_notification(
+        self, notification_id: str, title: str, message: str
+    ) -> None:
+        persistent_notification.async_create(
+            self.hass, message, title=title, notification_id=notification_id
+        )
+
+    def _dismiss_notification(self, notification_id: str) -> None:
+        persistent_notification.async_dismiss(self.hass, notification_id)
+
+    def _announce_frost(
+        self, now: datetime, prev_locked: bool, prev_temp_status: str | None
+    ) -> None:
+        """Notifications, repairs and events for lock and sensor health."""
+        if not self.frost_guard.settings.enabled:
+            if prev_temp_status and prev_temp_status != TEMP_OK:
+                self._clear_frost_sensor_issue()
+            self._last_temp_status = self.frost_temp_status
+            return
+        status = self.frost_temp_status
+        source = self.frost_temp_source or ""
+        if status != TEMP_OK:
+            if prev_temp_status in (None, TEMP_OK):
+                self._raise_frost_sensor_issue(source, status)
+        elif prev_temp_status not in (None, TEMP_OK):
+            self._clear_frost_sensor_issue()
+            self.hass.bus.async_fire(
+                EVENT_FROST_SENSOR_RECOVERED,
+                {
+                    "entity_id": source,
+                    "status": status,
+                    "temperature": self.sources.get("temperature"),
+                },
+            )
+            self._dismiss_notification(self._notify_id("frost_sensor"))
+        locked = self.frost_guard.locked
+        if locked and not prev_locked:
+            temp = self.sources.get("temperature")
+            self._create_notification(
+                self._notify_id("frost_lock"),
+                "Helios Tilt: frost lock",
+                (
+                    "Frost lock is on"
+                    + (f" at {temp:g} °C" if temp is not None else "")
+                    + ". The panel parks at the frost-guard angle and will not "
+                    "move until it has stayed above the unlock temperature "
+                    "for the hold time."
+                ),
+            )
+            self.hass.bus.async_fire(
+                EVENT_FROST_LOCK,
+                {
+                    "action": "engaged",
+                    "temperature": temp,
+                    "status": status,
+                    "entity_id": source,
+                    "locked_since": self.frost_guard.locked_since.isoformat()
+                    if self.frost_guard.locked_since
+                    else None,
+                    "park_angle": self.frost_guard_angle,
+                },
+            )
+            LOGGER.info("Frost lock engaged (%s)", self._frost_lock_detail())
+        elif prev_locked and not locked:
+            temp = self.sources.get("temperature")
+            self._dismiss_notification(self._notify_id("frost_lock"))
+            self._create_notification(
+                self._notify_id("frost_lock_off"),
+                "Helios Tilt: frost lock off",
+                (
+                    "Frost lock has cleared"
+                    + (f" at {temp:g} °C" if temp is not None else "")
+                    + ". Automatic control can move the panels again."
+                ),
+            )
+            self.hass.bus.async_fire(
+                EVENT_FROST_LOCK,
+                {
+                    "action": "released",
+                    "temperature": temp,
+                    "status": status,
+                    "entity_id": source,
+                },
+            )
+            LOGGER.info("Frost lock released")
+        self._last_temp_status = status
+
+    def _raise_frost_sensor_issue(self, entity_id: str, status: str) -> None:
+        issue_id = f"frost_sensor_{self.entry.entry_id}"
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="frost_sensor_unavailable",
+            translation_placeholders={
+                "entity": entity_id or "temperature",
+                "status": status,
+            },
+        )
+        self._create_notification(
+            self._notify_id("frost_sensor"),
+            "Helios Tilt: temperature sensor unavailable",
+            (
+                f"The temperature source ({entity_id or 'none'}) is {status}. "
+                "Frost lock will stay on if it is already on, and will not "
+                "park or unlock until a fresh reading arrives."
+            ),
+        )
+        self.hass.bus.async_fire(
+            EVENT_FROST_SENSOR,
+            {"entity_id": entity_id, "status": status},
+        )
+        LOGGER.warning("Frost-guard temperature source %s is %s", entity_id, status)
+
+    def _clear_frost_sensor_issue(self) -> None:
+        ir.async_delete_issue(self.hass, DOMAIN, f"frost_sensor_{self.entry.entry_id}")
+        self._dismiss_notification(self._notify_id("frost_sensor"))
+
+    def _announce_snow_remover_refused(
+        self,
+        panel: Panel,
+        reason: str,
+        temp: float | None,
+        status: str,
+        source: str | None,
+    ) -> None:
+        self._create_notification(
+            f"{DOMAIN}_snow_remover_refused_{panel.id}",
+            "Helios Tilt: snow remover refused",
+            (
+                f"{panel.title}: snow remover was refused ({reason})"
+                + (f" at {temp:g} °C" if temp is not None else "")
+                + ". It only runs when the temperature is safely above the "
+                "park threshold and frost lock is off."
+            ),
+        )
+        self.hass.bus.async_fire(
+            EVENT_SNOW_REMOVER_REFUSED,
+            {
+                "panel": panel.title,
+                "reason": reason,
+                "temperature": None if temp is None else round(temp, 1),
+                "status": status,
+                "entity_id": source,
+            },
+        )
+        LOGGER.warning("%s snow remover refused: %s", panel.title, reason)
+
     def diagnostics(self) -> dict[str, Any]:
         """State snapshot for diagnostics."""
         return {
@@ -1840,6 +2204,7 @@ class HeliosSite:
                 "storm": self.safety.storm,
                 "wind_stowed": self.safety.wind_stowed,
                 "last_wind": self.safety.last_wind,
+                "frost_guard": self.frost_guard.store_data(),
             },
             "readings": {
                 "wind": self.readings.wind,
@@ -1853,6 +2218,14 @@ class HeliosSite:
                 "snow": self.readings.snow,
             },
             "sources": self.sources,
+            "frost_guard": {
+                **self.frost_guard.store_data(),
+                "enabled": self.frost_guard.settings.enabled,
+                "temperature_status": self.frost_temp_status,
+                "temperature_source": self.frost_temp_source,
+                "park_temperature": self.frost_guard.settings.park_temperature,
+                "unlock_temperature": self.frost_guard.settings.unlock_temperature,
+            },
             "quiet": {
                 "active": self.quiet,
                 "until": self.quiet_until.isoformat() if self.quiet_until else None,

@@ -21,11 +21,13 @@ from .const import (
     REASON_CALIBRATE,
     REASON_DIFFUSE,
     REASON_FROST,
+    REASON_FROST_LOCK,
     REASON_MANUAL,
     REASON_NIGHT,
     REASON_QUIET,
     REASON_RAIN,
     REASON_SNOW,
+    REASON_SNOW_REMOVER,
     REASON_STORM,
     REASON_STOW,
     REASON_STRATEGY,
@@ -46,6 +48,8 @@ REASONS = [
     REASON_SNOW,
     REASON_RAIN,
     REASON_FROST,
+    REASON_FROST_LOCK,
+    REASON_SNOW_REMOVER,
     REASON_CALIBRATE,
     REASON_TRIGGER,
     REASON_QUIET,
@@ -132,7 +136,27 @@ def _last_move_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
     }
 
 
+def _weather_attrs(site: HeliosSite, panel: Panel) -> dict[str, Any]:
+    return {
+        "weather_entity": site.weather_entity,
+        "condition": site.readings.condition,
+        "cloud_coverage": site.readings.cloud,
+        "cloud_threshold": site.cloud_threshold,
+        "reason": panel.target_reason,
+        "detail": panel.target_detail,
+        "temperature": site.sources.get("temperature"),
+        "temperature_source": site.sources.get("temperature_source"),
+        "temperature_status": site.frost_temp_status,
+    }
+
+
 SENSORS: tuple[HeliosSensorDescription, ...] = (
+    HeliosSensorDescription(
+        key="weather",
+        translation_key="weather",
+        value_fn=lambda site, panel: site.readings.condition or "unknown",
+        attrs_fn=_weather_attrs,
+    ),
     HeliosSensorDescription(
         key="target_angle",
         translation_key="target_angle",

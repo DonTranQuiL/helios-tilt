@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0b1 (2026-11-22)
+
+Beta of the frost guard and snow remover work. Not a stable release — test on the live panel before 0.2.0.
+
+## 0.2.0 (unreleased)
+
+**Frost guard** (optional, off by default) and a **snow remover**. The older frost position is unchanged. Not released until the maintainer has tested it.
+
+
+- **Frost guard:** when the outdoor temperature reaches the park temperature (default 1 °C), Helios moves once to the frost-guard angle (default 20°) and then refuses every automatic move until the temperature has stayed above the unlock temperature (default 2 °C) for the hold time (default 45 min). Mode changes, night park and wind/rain/snow are locked; storm stow can stay allowed. The lock is stored so a restart cannot move a frozen panel. A missing, unknown or stale temperature sensor keeps an active lock on, and raises a persistent notification, a repair issue (cleared on recovery) and a `helios_tilt_frost_sensor_unavailable` event. Engaging and releasing the lock also send a notification and a `helios_tilt_frost_lock` event. New `binary_sensor.<panel>_frost_lock` (with temperature, thresholds, `locked_since`, `unlock_eta` and sensor status).
+- **Weather sensor:** `sensor.<panel>_weather` shows the weather entity Helios uses, the cloud cover, the cloud threshold, and the current decision reason.
+- **Snow remover:** `button.<panel>_snow_remover` and `helios_tilt.snow_remover` tilt to the maximum angle so snow can slide off, then resume after a configurable hold (default 10 min). Refused when frost lock is on, the temperature is at or below the park threshold, or the temperature source has no fresh value, with a notification and a `helios_tilt_snow_remover_refused` event. Wind and storm stow still have priority.
+- README (EN), en/nl translations, dashboard card labels, tests.
+
+
 ## 0.1.0 (2026-10-10)
 
 First stable release, tested on a real Tuya ZG-2002-RF two-relay setup.

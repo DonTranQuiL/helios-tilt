@@ -1,7 +1,7 @@
 // Helios Tilt card: side view of each panel with the sun, wind gauge,
 // controls, today's angle plan and the last moves. Plain custom element, no
 // build step. Keep this file ASCII-only (use \u escapes).
-const VERSION = "0.1.0";
+const VERSION = "0.2.0b1";
 const DOMAIN = "helios_tilt";
 const DEG = "\u00b0";
 const DASH = "\u2013";
@@ -20,13 +20,13 @@ const I18N = {
     status: {
       storm: "Storm mode", wind: "Wind stow", trigger: "Stow trigger", quiet: "Quiet hours", stowed: "Stowed", manual: "Manual", paused: "Paused after manual move",
       off: "Auto off", startup: "Waiting for data", stale: "Holding: no wind data", night: "Night park",
-      diffuse: "Cloudy: flat", snow: "Snow shedding", rain: "Heavy rain", frost: "Frost",
+      diffuse: "Cloudy: flat", snow: "Snow shedding", rain: "Heavy rain", frost: "Frost", frost_lock: "Frost lock", snow_remover: "Snow remover",
       fixed: "Annual optimum", seasonal: "Seasonal curve", daily: "Daily optimum", tracking: "Tracking the sun",
     },
     reasons: {
       strategy: "Strategy", night: "Night park", diffuse: "Cloudy", manual: "Manual", wind: "Wind stow",
       storm: "Storm mode", stow: "Stowed", snow: "Snow", rain: "Heavy rain", frost: "Frost", calibrate: "Calibration",
-      trigger: "Stow trigger", quiet: "Quiet hours",
+      trigger: "Stow trigger", quiet: "Quiet hours", frost_lock: "Frost lock", snow_remover: "Snow remover",
     },
     editor: {
       title: "Title", entities: "Panels (target angle sensors, empty = all)", show_wind: "Wind gauge",
@@ -46,13 +46,13 @@ const I18N = {
       storm: "Stormmodus", wind: "Wind: veilige stand", trigger: "Stow-trigger", quiet: "Stille uren", stowed: "Veilige stand", manual: "Handmatig",
       paused: "Gepauzeerd na handmatige beweging", off: "Auto uit", startup: "Wacht op data",
       stale: "Vasthouden: geen winddata", night: "Nachtstand", diffuse: "Bewolkt: plat", snow: "Sneeuw afglijden",
-      rain: "Zware regen", frost: "Vorst", fixed: "Jaaroptimum", seasonal: "Seizoenscurve", daily: "Dagoptimum",
+      rain: "Zware regen", frost: "Vorst", frost_lock: "Vorstvergrendeling", snow_remover: "Sneeuwruimer", fixed: "Jaaroptimum", seasonal: "Seizoenscurve", daily: "Dagoptimum",
       tracking: "Volgt de zon",
     },
     reasons: {
       strategy: "Strategie", night: "Nachtstand", diffuse: "Bewolkt", manual: "Handmatig", wind: "Wind",
       storm: "Stormmodus", stow: "Veilige stand", snow: "Sneeuw", rain: "Zware regen", frost: "Vorst", calibrate: "Kalibratie",
-      trigger: "Stow-trigger", quiet: "Stille uren",
+      trigger: "Stow-trigger", quiet: "Stille uren", frost_lock: "Vorstvergrendeling", snow_remover: "Sneeuwruimer",
     },
     editor: {
       title: "Titel", entities: "Panelen (doelhoeksensoren, leeg = alle)", show_wind: "Windmeter",
@@ -169,6 +169,8 @@ function statusOf(t, attrs, stormOn) {
   if (safety === "startup") return [s.startup, "idle"];
   if (safety === "stale") return [s.stale, "idle"];
   if (["snow", "rain", "frost"].includes(safety)) return [s[safety], "cold"];
+  if (attrs.reason === "frost_lock") return [s.frost_lock, "cold"];
+  if (attrs.reason === "snow_remover") return [s.snow_remover, "cold"];
   if (attrs.mode === "manual") return [s.manual, "info"];
   if (attrs.paused_until) return [s.paused, "info"];
   if (attrs.auto === false) return [s.off, "idle"];
@@ -597,7 +599,7 @@ const STYLE = `
   .r-stow { background: var(--warning-color, #e08a00); }
   .r-manual, .r-calibrate { background: var(--info-color, #2f80ed); }
   .r-night { background: #5b5fc7; }
-  .r-diffuse, .r-snow, .r-rain, .r-frost { background: #1aa5c4; }
+  .r-diffuse, .r-snow, .r-rain, .r-frost, .r-frost_lock, .r-snow_remover { background: #1aa5c4; }
   .empty, .notice { color: var(--secondary-text-color); font-size: .9em; }
   .notice { padding: 8px 0; }
   .notice.error { color: var(--error-color, #d93b3b); }

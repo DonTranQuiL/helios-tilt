@@ -490,7 +490,7 @@
               "rain_threshold": "Bij een intensiteitssensor: zware regen vanaf deze waarde. Andere eenheden worden omgerekend.",
               "snow_sensor": "Een binaire sensor (aan = sneeuw) of een sneeuwdiktesensor (cm, mm, m of in).",
               "snow_threshold": "Bij een diktesensor: sneeuwstand vanaf deze dikte.",
-              "temperature_sensor": "Voor de vorstgrens in plaats van de weertemperatuur. Fahrenheit wordt omgerekend."
+              "temperature_sensor": "Wordt gebruikt voor de vorstvergrendeling en de oudere vorststand in plaats van de weer-temperatuur. Fahrenheit wordt omgerekend. Nodig voor een betrouwbare vorstvergrendeling."
             }
           },
           "triggers": {
@@ -531,6 +531,28 @@
               "direction_sensor": "Graden (0 = noord) of N/NO/... Leeg = de windrichting van de weer-entiteit.",
               "direction_sector": "Graden rond de voorkant (azimut) of achterkant van het paneel."
             }
+          },
+          "frost_guard": {
+            "name": "Vorstvergrendeling (optioneel)",
+            "description": "Eén keer parkeren vóór de vorst, daarna geen automatische bewegingen tot het is ontdooid. Standaard uit. De oudere vorststand blijft ongewijzigd.",
+            "data": {
+              "frost_guard": "Vorstvergrendeling inschakelen",
+              "frost_guard_park_temperature": "Parkeren bij of onder",
+              "frost_guard_unlock_temperature": "Ontgrendelen boven",
+              "frost_guard_unlock_hold": "Wachttijd voor ontgrendelen",
+              "frost_guard_angle": "Hoek bij vorstvergrendeling",
+              "frost_guard_allow_storm": "Stormstand toestaan tijdens vergrendeling",
+              "snow_remover_hold": "Wachttijd sneeuwruimer"
+            },
+            "data_description": {
+              "frost_guard": "Zodra de buitentemperatuur de parkeertemperatuur bereikt, beweegt Helios één keer naar de vorsthoek en vergrendelt daarna. Ontgrendelen gebeurt pas als de temperatuur de wachttijd lang boven de ontgrendeltemperatuur is gebleven.",
+              "frost_guard_park_temperature": "Vergrendelen bij of onder deze temperatuur. Kies een waarde boven het vriespunt, zodat de actuator nog vrij kan bewegen.",
+              "frost_guard_unlock_temperature": "Moet warmer zijn dan de parkeertemperatuur. De vergrendeling blijft aan tot de meting deze wachttijd lang daarboven blijft.",
+              "frost_guard_unlock_hold": "Hoe lang de temperatuur boven de ontgrendeltemperatuur moet blijven voordat bewegingen weer mogen. Voorkomt heen-en-weer schakelen.",
+              "frost_guard_angle": "De hoek van die ene parkeerbeweging. Blijft binnen de zachte grenzen van elk paneel. Plat (dicht bij het minimum) is het veiligst bij ijs.",
+              "frost_guard_allow_storm": "Aan: een storm mag het paneel nog naar de veilige stand brengen tijdens de vergrendeling. Wind, regen, sneeuw en moduswijzigingen blijven geblokkeerd.",
+              "snow_remover_hold": "Hoe lang de sneeuwruimer het paneel op de maximumhoek houdt voordat de automatische sturing terugkeert."
+            }
           }
         }
       }
@@ -555,7 +577,8 @@
       "calibration_failed": "De kalibratie is gestopt (een relais reageerde niet, of het duurde te lang). Beide relais zijn uit.",
       "relays_unavailable": "Een relais is offline ({entities}). Controleer het Zigbee-apparaat (bereikbaar in Zigbee2MQTT?) en probeer het opnieuw.",
       "outside_limits": "Buiten de zachte grenzen ({min}° tot {max}°). Het paneel gaat nooit voorbij een grens en zou bij de dichtstbijzijnde stoppen. Vul een hoek binnen de grenzen in.",
-      "season_flat": "De winter- en zomerhoek zijn gelijk, dus de seizoenscurve is vlak. Voorstel voor breedtegraad {latitude}°: winter {winter}°, zomer {summer}°. Bevestig opnieuw om ze gelijk te houden."
+      "season_flat": "De winter- en zomerhoek zijn gelijk, dus de seizoenscurve is vlak. Voorstel voor breedtegraad {latitude}°: winter {winter}°, zomer {summer}°. Bevestig opnieuw om ze gelijk te houden.",
+      "unlock_below_park": "De ontgrendeltemperatuur moet hoger zijn dan de parkeertemperatuur."
     }
   },
   "entity": {
@@ -590,8 +613,13 @@
           "frost": "Vorst",
           "calibrate": "Kalibratie",
           "trigger": "Stow-trigger",
-          "quiet": "Stille uren"
+          "quiet": "Stille uren",
+          "frost_lock": "Vorstvergrendeling",
+          "snow_remover": "Sneeuwruimer"
         }
+      },
+      "weather": {
+        "name": "Weer"
       }
     },
     "select": {
@@ -629,6 +657,9 @@
       },
       "actuator_available": {
         "name": "Actuator beschikbaar"
+      },
+      "frost_lock": {
+        "name": "Vorstvergrendeling"
       }
     },
     "button": {
@@ -643,6 +674,9 @@
       },
       "travel_cancel": {
         "name": "Looptijd meten: annuleren"
+      },
+      "snow_remover": {
+        "name": "Sneeuwruimer"
       }
     }
   },
@@ -777,6 +811,16 @@
           "description": "Hoe lang eerst te sluiten. Standaard: de maximale looptijd."
         }
       }
+    },
+    "snow_remover": {
+      "name": "Sneeuwruimer",
+      "description": "Zet het paneel op de maximumhoek zodat sneeuw eraf kan glijden, en hervat daarna de automatische sturing na de wachttijd. Geweigerd als de vorstvergrendeling aan staat, de temperatuur op of onder de parkeertemperatuur is, of de temperatuursensor geen verse waarde heeft. Wind- en stormstand blijven voorrang houden.",
+      "fields": {
+        "duration": {
+          "name": "Wachttijd",
+          "description": "Hoe lang het paneel op de maximumhoek blijft. Leeg laten voor de ingestelde standaard."
+        }
+      }
     }
   },
   "exceptions": {
@@ -794,6 +838,9 @@
     },
     "not_relays": {
       "message": "Kies een paneel dat met twee relais wordt aangestuurd."
+    },
+    "snow_remover_refused": {
+      "message": "{panel}: sneeuwruimer geweigerd ({reason}). Deze werkt alleen als de temperatuur veilig boven de parkeertemperatuur is en de vorstvergrendeling uit staat."
     }
   },
   "issues": {
@@ -808,6 +855,10 @@
     "relay_unavailable": {
       "title": "{panel}: relais offline",
       "description": "{entities} is niet beschikbaar, dus Helios Tilt kan dit paneel niet bewegen (Zigbee-apparaat offline?). Er wordt niets geschakeld tot het terug is; daarna gaat het paneel vanzelf naar zijn huidige doel en verdwijnt deze melding. Controleer de voeding van het apparaat en de Zigbee-verbinding in Zigbee2MQTT."
+    },
+    "frost_sensor_unavailable": {
+      "title": "Temperatuursensor is {status}",
+      "description": "De temperatuurbron {entity} is {status}. Met de vorstvergrendeling aan wordt er niet geparkeerd of ontgrendeld op een ontbrekende meting, en een actieve vergrendeling blijft aan. De melding verdwijnt vanzelf zodra er weer een verse waarde is. Je kunt ook automatiseren op de event helios_tilt_frost_sensor_unavailable."
     }
   }
 }

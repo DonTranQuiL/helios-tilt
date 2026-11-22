@@ -33,6 +33,9 @@
       },
       "pv_performance": {
         "default": "mdi:solar-power-variant"
+      },
+      "weather": {
+        "default": "mdi:weather-partly-cloudy"
       }
     },
     "select": {
@@ -85,6 +88,12 @@
         "state": {
           "on": "mdi:lan-connect"
         }
+      },
+      "frost_lock": {
+        "default": "mdi:snowflake-alert",
+        "state": {
+          "off": "mdi:snowflake-off"
+        }
       }
     },
     "button": {
@@ -99,6 +108,9 @@
       },
       "travel_cancel": {
         "default": "mdi:timer-cancel-outline"
+      },
+      "snow_remover": {
+        "default": "mdi:weather-snowy-heavy"
       }
     }
   },
@@ -123,6 +135,9 @@
     },
     "calibrate_travel": {
       "service": "mdi:timer-cog-outline"
+    },
+    "snow_remover": {
+      "service": "mdi:weather-snowy-heavy"
     }
   }
 }

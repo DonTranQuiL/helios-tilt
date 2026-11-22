@@ -49,6 +49,12 @@ from .const import (
     CONF_FEEDBACK,
     CONF_FEEDBACK_KIND,
     CONF_FROST_ANGLE,
+    CONF_FROST_GUARD,
+    CONF_FROST_GUARD_ALLOW_STORM,
+    CONF_FROST_GUARD_ANGLE,
+    CONF_FROST_GUARD_PARK_TEMP,
+    CONF_FROST_GUARD_UNLOCK_HOLD,
+    CONF_FROST_GUARD_UNLOCK_TEMP,
     CONF_FROST_MODE,
     CONF_FROST_TEMP,
     CONF_HOME_AFTER_MOVES,
@@ -82,6 +88,7 @@ from .const import (
     CONF_SEASON_WEIGHT,
     CONF_SNOW_ANGLE,
     CONF_SNOW_MODE,
+    CONF_SNOW_REMOVER_HOLD,
     CONF_SNOW_SENSOR,
     CONF_SNOW_THRESHOLD,
     CONF_STALE_MINUTES,
@@ -247,7 +254,14 @@ OPT_SOURCES = "sources"
 OPT_TRIGGERS = "triggers"
 OPT_QUIET = "quiet"
 OPT_DIRECTION = "direction"
-OPTION_SECTIONS = (OPT_SOURCES, OPT_TRIGGERS, OPT_QUIET, OPT_DIRECTION)
+OPT_FROST_GUARD = "frost_guard"
+OPTION_SECTIONS = (
+    OPT_SOURCES,
+    OPT_TRIGGERS,
+    OPT_QUIET,
+    OPT_DIRECTION,
+    OPT_FROST_GUARD,
+)
 OPTION_ENTITY_KEYS = (
     CONF_RAIN_SENSOR,
     CONF_SNOW_SENSOR,
@@ -304,11 +318,33 @@ def _options_schema(values: dict[str, Any]) -> vol.Schema:
             5, 90, 1, "°"
         ),
     }
+    frost_guard = {
+        vol.Required(CONF_FROST_GUARD, default=v[CONF_FROST_GUARD]): bool,
+        vol.Required(
+            CONF_FROST_GUARD_PARK_TEMP, default=v[CONF_FROST_GUARD_PARK_TEMP]
+        ): _num(-20, 10, 0.5, "°C"),
+        vol.Required(
+            CONF_FROST_GUARD_UNLOCK_TEMP, default=v[CONF_FROST_GUARD_UNLOCK_TEMP]
+        ): _num(-20, 15, 0.5, "°C"),
+        vol.Required(
+            CONF_FROST_GUARD_UNLOCK_HOLD, default=v[CONF_FROST_GUARD_UNLOCK_HOLD]
+        ): _num(1, 1440, 1, "min"),
+        vol.Required(
+            CONF_FROST_GUARD_ANGLE, default=v[CONF_FROST_GUARD_ANGLE]
+        ): _angle(),
+        vol.Required(
+            CONF_FROST_GUARD_ALLOW_STORM, default=v[CONF_FROST_GUARD_ALLOW_STORM]
+        ): bool,
+        vol.Required(CONF_SNOW_REMOVER_HOLD, default=v[CONF_SNOW_REMOVER_HOLD]): _num(
+            1, 240, 1, "min"
+        ),
+    }
     for name, schema in (
         (OPT_SOURCES, sources),
         (OPT_TRIGGERS, triggers),
         (OPT_QUIET, quiet),
         (OPT_DIRECTION, direction),
+        (OPT_FROST_GUARD, frost_guard),
     ):
         fields[vol.Required(name)] = section(vol.Schema(schema), {"collapsed": True})
     return vol.Schema(fields)
@@ -329,6 +365,8 @@ def _validate_options(data: dict[str, Any]) -> dict[str, str]:
         return errors
     if (CONF_QUIET_START in data) != (CONF_QUIET_END in data):
         return {"base": "quiet_incomplete"}
+    if data[CONF_FROST_GUARD_UNLOCK_TEMP] <= data[CONF_FROST_GUARD_PARK_TEMP]:
+        return {"base": "unlock_below_park"}
     return {}
 
 
