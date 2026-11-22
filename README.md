@@ -39,7 +39,7 @@ Helios Tilt is a Home Assistant integration that sets the tilt of solar panels (
 | 🔌 **Works with dumb actuators** | Two cheap relays (for example a **Tuya ZG-2002-RF** via Zigbee2MQTT) are enough: time-based position estimate, interlock, a hardware countdown fail-safe, automatic homing against the limit switches, RF-remote detection and offline handling. [Read more](#works-with-dumb-actuators-two-relays-timed). |
 | ☀️ **Real sun position** | The NOAA solar position algorithm with refraction, computed locally. No cloud service. |
 | 📐 **Four strategies** | Fixed annual optimum, a seasonal curve, one move per day to the day's optimum, or full sun tracking with a cloudy-day mode and a night park. |
-| 🌬️ **Safety first** | Wind and gust stow with a calm period, a latching storm mode, snow/rain/frost positions, custom stow triggers and an optional wind direction rule. |
+| 🌬️ **Safety first** | Wind and gust stow with a calm period, a latching storm mode, an optional frost guard that parks once then locks, snow/rain/frost positions, a snow remover, custom stow triggers and an optional wind direction rule. |
 | 🎛️ **Customizable** | Your own rain, snow and temperature sensors, quiet hours, a timed stow, and transparent attributes that show which source drives each decision. |
 | 🔩 **Any actuator** | Also drives a `cover`, a `number`/`input_number` or a script, with linear or calibration-table mapping, and position or inclinometer feedback. |
 | 🛡️ **Gentle on the hardware** | Never commands a moving actuator. Minimum time between moves, deadband, hysteresis, fault back-off and a repair notice when an actuator gets stuck. |
@@ -169,16 +169,19 @@ Every minute, and whenever a relevant entity changes, Helios runs one decision r
 
 | Priority | Rule | Panel goes to |
 | --- | --- | --- |
-| 1 | **Storm mode** or **wind stow** | stow angle, immediately |
-| 2 | **Custom stow trigger** on | trigger angle (or stow angle), immediately |
-| 3 | Stowed with the **Stow** action (optionally for a duration) | stow angle |
-| 4 | **No valid wind data** (start-up, or stale) | stays put; stays stowed if the last wind was high |
-| 5 | **Snow / heavy rain / frost** (if enabled) | snow / rain / frost angle |
-| 6 | **Manual mode** | your manual angle |
-| 7 | **Paused** after a move by hand | stays put |
-| 8 | **Automatic control off** | stays put |
-| 9 | **Quiet hours** | stays put (the night park still happens) |
-| 10 | **Strategy** | see below |
+| 1 | **Frost guard** just tripped | one move to the frost-guard angle, then lock |
+| 2 | **Frost lock** on | stays put (storm stow is the only optional exception) |
+| 3 | **Storm mode** or **wind stow** | stow angle, immediately (storm can still run during frost lock if you allow it) |
+| 4 | **Custom stow trigger** on | trigger angle (or stow angle), immediately |
+| 5 | Stowed with the **Stow** action (optionally for a duration) | stow angle |
+| 6 | **No valid wind data** (start-up, or stale) | stays put; stays stowed if the last wind was high |
+| 7 | **Snow / heavy rain / frost** (if enabled) | snow / rain / frost angle |
+| 8 | **Snow remover** (timed) | maximum angle, until the hold ends |
+| 9 | **Manual mode** | your manual angle |
+| 10 | **Paused** after a move by hand | stays put |
+| 11 | **Automatic control off** | stays put |
+| 12 | **Quiet hours** | stays put (the night park still happens) |
+| 13 | **Strategy** | see below |
 
 ### Strategies
 
@@ -209,6 +212,7 @@ The **estimated gain** sensor compares today's modelled clear-sky energy at the 
 - **Resume:** only after the wind has stayed at or below the **resume speed** (35 km/h) for the **calm time** (10 min).
 - **Storm mode:** at the **storm speed** (75 km/h), or with `helios_tilt.stow` and `storm: true`, the site latches into storm mode for the **hold time** (6 h) after the last strong wind (0 = until you resume by hand). Storm mode always moves, regardless of quiet hours or the wind direction rule.
 - **Missing data:** without fresh wind data (older than 120 min) panels freeze; if it was windy, they stay stowed. After a restart nothing moves until valid wind data arrives. The config flow refuses a setup without a wind source.
+- **Frost guard** (Configure, optional, **off** by default): parks once *before* the freeze, then locks. When the outdoor temperature (your temperature sensor, or the weather entity) falls to the **park temperature** (default 1 °C), Helios issues **one** urgent move to the **frost-guard angle** (default 20°) and then refuses every Helios-initiated move — tracking, night park, mode changes, manual angle, wind, rain and snow — until the temperature has stayed above the **unlock temperature** (default 2 °C) for the **unlock hold** (default 45 min). That stop-and-wait is what prevents the lock from flipping on and off as the reading wobbles. A restart keeps the lock: a frozen panel is never commanded again until it has thawed. If the temperature sensor is unavailable, unknown or stale, a lock already on stays on, and Helios creates a persistent notification, a repair issue (cleared when the sensor recovers) and a `helios_tilt_frost_sensor_unavailable` event you can automate on. Engaging and releasing the lock also send a notification and a `helios_tilt_frost_lock` event (`action: engaged` or `released`). Storm stow is allowed during the lock unless you turn that exception off. The older **frost position** option is unchanged and is not a lock: it still moves to the frost angle once it is already freezing, so frost guard is the one to use against iced actuators.
 - **Actuator protection:** never commands a moving actuator; a repair notice appears when an actuator doesn't reach its target.
 
 > [!TIP]
@@ -235,7 +239,7 @@ Each one overrides the weather entity while it has a value, and falls back to th
 | --- | --- | --- |
 | Rain | a binary sensor (on = heavy rain), or a precipitation rate | mm/h, mm/d, in/h or in/d, compared with *Heavy rain from* (5 mm/h). Needs *Heavy rain position* on. |
 | Snow | a binary sensor (on = snow), or a snow depth | mm, cm, m, in or ft, compared with *Snow from depth* (1 cm). |
-| Outdoor temperature | a temperature sensor | Used for the frost threshold; °F is converted. |
+| Outdoor temperature | a temperature sensor | Used for frost guard and the older frost threshold; °F is converted. |
 
 A sensor with an unknown unit is ignored, with a warning in the log.
 
@@ -244,6 +248,12 @@ A sensor with an unknown unit is ignored, with a warning in the log.
 Pick any entities (binary sensors, input booleans, switches …). While **any** is `on`, every panel goes to the *trigger stow angle* (or its own stow angle), immediately and with safety priority. The reason and the card name the trigger, e.g. *Stow trigger (Hail warning)*. When all are off, the panels resume at once. Ideas: a hail warning, `input_boolean.window_cleaning`, a roof-access door.
 
 For a one-off stow, `helios_tilt.stow` takes an optional `duration` and resumes by itself afterwards.
+
+### Snow remover
+
+The **Snow remover** button (`button.<panel>_snow_remover`) and the `helios_tilt.snow_remover` action tilt the panel to its **maximum angle** so snow can slide off, then resume automatic control after the **hold time** (default 10 min, or pass `duration` on the action).
+
+It is **refused** when frost lock is on, the temperature is at or below the park temperature, or the temperature source is unavailable, unknown or stale — and when a wind or storm stow is already active. A refusal creates a persistent notification and a `helios_tilt_snow_remover_refused` event with the reason. Wind and storm stow still have priority if the weather turns while the hold is running.
 
 ### Quiet hours
 
@@ -467,13 +477,16 @@ One device per panel. Entity IDs follow the panel name, here `garden`:
 | `select.garden_mode` | `auto`, `manual`, `fixed`, `seasonal`, `daily`, `tracking` |
 | `number.garden_manual_angle` | Set an angle; switches the panel to manual |
 | `switch.garden_automatic_control` | Off: no strategy moves (safety still stows) |
+| `binary_sensor.garden_frost_lock` | Frost guard lock is on. Attributes: `temperature`, `temperature_status`, `temperature_sensor`, `park_temperature`, `unlock_temperature`, `unlock_hold_minutes`, `locked_since`, `above_since`, `unlock_eta`, `allow_storm` |
 | `binary_sensor.garden_storm_mode` | Storm mode latched |
 | `binary_sensor.garden_wind_stow` | Stowed for safety (wind, trigger) or by hand. Attributes: wind speed and thresholds in km/h, and the sources: `weather_entity`, `wind_sensor`, `weather_wind`, `weather_gust`, `sensor_wind`, `wind_source`, `wind_bearing`, `temperature_source`, `active_triggers` |
+| `sensor.garden_weather` | The weather entity Helios is using, with `condition`, `cloud_coverage`, `cloud_threshold`, and the current decision `reason` / `detail` |
 | `sensor.garden_last_move` | Reason of the last move, with the last 10 moves in `history` |
 | `sensor.garden_moves_today` | Commanded moves today |
 | `sensor.garden_estimated_gain` | Modelled clear-sky energy today vs the fixed annual optimum, while following the strategy, in % (`instant_gain` for right now) |
 | `binary_sensor.garden_position_uncertain` | Two relays only: the estimate needs homing. Attributes: `stroke`, `moves_since_home`, `travel_since_home`, `last_homed`, `fault` |
 | `binary_sensor.garden_actuator_available` | Two relays only: off while a relay or countdown is unavailable (device offline). Attributes: `unavailable_entities`, `retry_after` |
+| `button.garden_snow_remover` | Tilt to the maximum angle to shed snow, then resume after the hold. Refused when frozen or the temperature is unknown |
 | `button.garden_home_now` | Two relays only: drive into the home end stop now |
 | `button.garden_travel_calibration_start` / `_end_reached` / `_cancel` | Two relays only (configuration): time the travel without the dialog |
 | `sensor.garden_pv_actual_vs_model` | Only with a PV power sensor and peak power: actual output as % of the clear-sky model |
@@ -529,6 +542,38 @@ automation:
       - action: notify.mobile_app_phone
         data:
           message: "Solar panels stowed: {{ state_attr('binary_sensor.garden_wind_stow', 'wind_speed') }} km/h"
+```
+</details>
+
+<details>
+<summary><b>Notify when the frost-guard temperature sensor fails</b></summary>
+
+```yaml
+automation:
+  - alias: "Helios frost sensor unavailable"
+    triggers:
+      - trigger: event
+        event_type: helios_tilt_frost_sensor_unavailable
+    actions:
+      - action: notify.mobile_app_phone
+        data:
+          message: "Helios temperature sensor is {{ trigger.event.data.status }} ({{ trigger.event.data.entity_id }})"
+```
+</details>
+
+<details>
+<summary><b>Notify when frost lock engages or clears</b></summary>
+
+```yaml
+automation:
+  - alias: "Helios frost lock"
+    triggers:
+      - trigger: event
+        event_type: helios_tilt_frost_lock
+    actions:
+      - action: notify.mobile_app_phone
+        data:
+          message: "Frost lock {{ trigger.event.data.action }} ({{ trigger.event.data.temperature }} °C)"
 ```
 </details>
 

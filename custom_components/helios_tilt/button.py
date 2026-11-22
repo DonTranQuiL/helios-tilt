@@ -49,27 +49,34 @@ BUTTONS: tuple[HeliosButtonDescription, ...] = (
 )
 
 
+SNOW_REMOVER = HeliosButtonDescription(
+    key="snow_remover",
+    translation_key="snow_remover",
+    press_fn=lambda site, panel: site.async_snow_remover(panel),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HeliosConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Only panels driven by two relays get these."""
+    """Snow remover on every panel; travel buttons only on two-relay panels."""
     site = entry.runtime_data
     for panel in site.panels.values():
-        if panel.driver is None:
-            continue
-        async_add_entities(
-            [HeliosButton(site, panel, d) for d in BUTTONS],
-            config_subentry_id=panel.id,
-        )
+        entities = [HeliosButton(site, panel, SNOW_REMOVER)]
+        if panel.driver is not None:
+            entities.extend(HeliosButton(site, panel, d) for d in BUTTONS)
+        async_add_entities(entities, config_subentry_id=panel.id)
 
 
 class HeliosButton(HeliosEntity, ButtonEntity):
-    """Home now or a calibration step."""
+    """Home now, a calibration step, or the snow remover."""
 
     entity_description: HeliosButtonDescription
 
     async def async_press(self) -> None:
         """Do it."""
-        self.entity_description.press_fn(self.site, self.panel)
+        result = self.entity_description.press_fn(self.site, self.panel)
+        if hasattr(result, "__await__"):
+            await result

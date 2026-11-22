@@ -7,7 +7,7 @@ from typing import Final
 
 DOMAIN: Final = "helios_tilt"
 NAME: Final = "Helios Tilt"
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 LOGGER = logging.getLogger(__package__)
 
 PLATFORMS: Final = ["binary_sensor", "button", "number", "select", "sensor", "switch"]
@@ -17,6 +17,11 @@ CARD_FILENAME: Final = "helios-tilt-card.js"
 CARD_URL: Final = f"/{DOMAIN}/{CARD_FILENAME}"
 
 EVENT_MOVE: Final = f"{DOMAIN}_move"
+EVENT_FROST_SENSOR: Final = f"{DOMAIN}_frost_sensor_unavailable"
+EVENT_FROST_SENSOR_RECOVERED: Final = f"{DOMAIN}_frost_sensor_recovered"
+EVENT_FROST_LOCK: Final = f"{DOMAIN}_frost_lock"
+EVENT_SNOW_REMOVER: Final = f"{DOMAIN}_snow_remover"
+EVENT_SNOW_REMOVER_REFUSED: Final = f"{DOMAIN}_snow_remover_refused"
 TICK_SECONDS: Final = 60
 STORE_VERSION: Final = 1
 
@@ -38,6 +43,14 @@ CONF_SNOW_MODE: Final = "snow_mode"
 CONF_RAIN_MODE: Final = "rain_mode"
 CONF_FROST_MODE: Final = "frost_mode"
 CONF_FROST_TEMP: Final = "frost_temperature"  # degC
+# Frost guard (park once, then lock). Off by default; frost_mode is unchanged.
+CONF_FROST_GUARD: Final = "frost_guard"
+CONF_FROST_GUARD_PARK_TEMP: Final = "frost_guard_park_temperature"  # degC
+CONF_FROST_GUARD_ANGLE: Final = "frost_guard_angle"
+CONF_FROST_GUARD_UNLOCK_TEMP: Final = "frost_guard_unlock_temperature"  # degC
+CONF_FROST_GUARD_UNLOCK_HOLD: Final = "frost_guard_unlock_hold"  # minutes
+CONF_FROST_GUARD_ALLOW_STORM: Final = "frost_guard_allow_storm"
+CONF_SNOW_REMOVER_HOLD: Final = "snow_remover_hold"  # minutes
 CONF_MIN_INTERVAL: Final = "min_move_interval"  # minutes
 CONF_MANUAL_PAUSE: Final = "manual_pause"  # minutes
 CONF_DEADBAND: Final = "deadband"  # degrees
@@ -84,6 +97,13 @@ SITE_DEFAULTS: Final = {
     CONF_RAIN_MODE: False,
     CONF_FROST_MODE: False,
     CONF_FROST_TEMP: -2.0,
+    CONF_FROST_GUARD: False,
+    CONF_FROST_GUARD_PARK_TEMP: 1.0,
+    CONF_FROST_GUARD_ANGLE: 20.0,
+    CONF_FROST_GUARD_UNLOCK_TEMP: 2.0,
+    CONF_FROST_GUARD_UNLOCK_HOLD: 45,
+    CONF_FROST_GUARD_ALLOW_STORM: True,
+    CONF_SNOW_REMOVER_HOLD: 10,
     CONF_MIN_INTERVAL: 5,
     CONF_MANUAL_PAUSE: 60,
     CONF_DEADBAND: 2.0,
@@ -212,6 +232,15 @@ REASON_STOW: Final = "stow"
 REASON_SNOW: Final = "snow"
 REASON_RAIN: Final = "rain"
 REASON_FROST: Final = "frost"
+REASON_FROST_LOCK: Final = "frost_lock"
+REASON_SNOW_REMOVER: Final = "snow_remover"
 REASON_CALIBRATE: Final = "calibrate"
 REASON_TRIGGER: Final = "trigger"
 REASON_QUIET: Final = "quiet"
+
+# Frost-guard temperature reading status (attributes and announcements).
+TEMP_OK: Final = "ok"
+TEMP_UNAVAILABLE: Final = "unavailable"
+TEMP_UNKNOWN: Final = "unknown"
+TEMP_STALE: Final = "stale"
+TEMP_MISSING: Final = "missing"

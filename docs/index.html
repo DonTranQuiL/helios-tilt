@@ -101,7 +101,7 @@
                 <div class="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6">
                     <i data-lucide="sliders-horizontal" class="text-amber-400 w-7 h-7 mb-4"></i>
                     <h3 class="text-xl font-semibold text-white mb-2">Your rules</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Your own rain, snow and temperature sensors, custom stow triggers, quiet hours (the night park still happens), a timed stow and an optional wind direction rule. Attributes show which source drives each decision.</p>
+                    <p class="text-slate-400 text-sm leading-relaxed">Your own rain, snow and temperature sensors, an optional frost guard that parks once then locks, a snow remover that tilts to the maximum so snow can slide off, custom stow triggers, quiet hours (the night park still happens), a timed stow and an optional wind direction rule. Attributes show which source drives each decision.</p>
                 </div>
                 <div class="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6">
                     <i data-lucide="shield-check" class="text-amber-400 w-7 h-7 mb-4"></i>
@@ -156,11 +156,14 @@ Close countdown  number.&lt;name&gt;_countdown_l2</code></pre>
                 <p class="text-slate-400 mb-6">Every minute, and whenever the weather or an actuator changes, the first rule that applies wins.</p>
                 <div class="rounded-2xl border border-slate-700 bg-[#0d1326] p-6">
                     <ol class="space-y-3 text-sm list-decimal list-inside text-slate-300">
+                        <li><span class="text-white font-semibold">Frost guard</span> just tripped: one move to the frost-guard angle, then lock</li>
+                        <li><span class="text-white font-semibold">Frost lock</span> on: stays put (storm stow is the only optional exception)</li>
                         <li><span class="text-white font-semibold">Storm or wind stow</span>: stow angle, immediately</li>
                         <li><span class="text-white font-semibold">Custom stow trigger</span>: trigger angle, immediately</li>
                         <li><span class="text-white font-semibold">Stowed by hand</span> (optionally for a duration): stow angle</li>
                         <li><span class="text-white font-semibold">No valid wind data</span>: hold (stay stowed if it was windy)</li>
                         <li><span class="text-white font-semibold">Snow / heavy rain / frost</span>: their own angles (optional)</li>
+                        <li><span class="text-white font-semibold">Snow remover</span> (timed): maximum angle, until the hold ends</li>
                         <li><span class="text-white font-semibold">Manual mode</span>: your angle</li>
                         <li><span class="text-white font-semibold">Paused</span> after a move by hand, or automatic control off: hold</li>
                         <li><span class="text-white font-semibold">Quiet hours</span>: hold (the night park still happens)</li>

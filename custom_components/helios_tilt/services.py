@@ -1,4 +1,4 @@
-"""Actions: set_tilt, stow, resume_auto, set_mode, calibrate, home, calibrate_travel."""
+"""Actions: set_tilt, stow, resume_auto, set_mode, calibrate, home, calibrate_travel, snow_remover."""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ SERVICE_SET_MODE = "set_mode"
 SERVICE_CALIBRATE = "calibrate"
 SERVICE_HOME = "home"
 SERVICE_CALIBRATE_TRAVEL = "calibrate_travel"
+SERVICE_SNOW_REMOVER = "snow_remover"
 
 ATTR_ANGLE = "angle"
 ATTR_STORM = "storm"
@@ -32,6 +33,7 @@ ATTR_DURATION = "duration"
 ATTR_MODE = "mode"
 ATTR_ACTION = "action"
 ATTR_HOMING_SECONDS = "homing_seconds"
+ATTR_DURATION_HOLD = "duration"
 TRAVEL_ACTIONS = ["start", "stop", "cancel"]
 
 TARGET = {
@@ -60,6 +62,12 @@ TRAVEL_SCHEMA = vol.Schema(
         ),
     }
 )
+SNOW_REMOVER_SCHEMA = vol.Schema(
+    {
+        **TARGET,
+        vol.Optional(ATTR_DURATION): vol.All(cv.time_period, cv.positive_timedelta),
+    }
+)
 
 
 # Action name -> schema (fields besides the target are documented in services.yaml).
@@ -71,6 +79,7 @@ SCHEMAS: dict[str, vol.Schema] = {
     SERVICE_CALIBRATE: ANGLE_SCHEMA,
     SERVICE_HOME: HOME_SCHEMA,
     SERVICE_CALIBRATE_TRAVEL: TRAVEL_SCHEMA,
+    SERVICE_SNOW_REMOVER: SNOW_REMOVER_SCHEMA,
 }
 
 
@@ -206,4 +215,13 @@ def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_HOME, home, schema=HOME_SCHEMA)
     hass.services.async_register(
         DOMAIN, SERVICE_CALIBRATE_TRAVEL, calibrate_travel, schema=TRAVEL_SCHEMA
+    )
+
+    async def snow_remover(call: ServiceCall) -> None:
+        for site, panels in resolve_panels(hass, call).items():
+            for panel in panels:
+                await site.async_snow_remover(panel, call.data.get(ATTR_DURATION))
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_SNOW_REMOVER, snow_remover, schema=SNOW_REMOVER_SCHEMA
     )

@@ -490,7 +490,7 @@
               "rain_threshold": "For a rate sensor: heavy rain at or above this rate. Other units are converted.",
               "snow_sensor": "A binary sensor (on = snow) or a snow depth sensor (cm, mm, m or in).",
               "snow_threshold": "For a depth sensor: snow mode at or above this depth.",
-              "temperature_sensor": "Used for the frost threshold instead of the weather temperature. Fahrenheit is converted."
+              "temperature_sensor": "Used for frost guard and the older frost position instead of the weather temperature. Fahrenheit is converted. Required for reliable frost lock."
             }
           },
           "triggers": {
@@ -531,6 +531,28 @@
               "direction_sensor": "Degrees (0 = north) or N/NE/... Empty = the weather entity's wind bearing.",
               "direction_sector": "Degrees around the panel's front (azimuth) or rear."
             }
+          },
+          "frost_guard": {
+            "name": "Frost guard (optional)",
+            "description": "Park once before it freezes, then refuse every automatic move until it has thawed. Off by default. The older frost position is unchanged.",
+            "data": {
+              "frost_guard": "Enable frost guard",
+              "frost_guard_park_temperature": "Park at or below",
+              "frost_guard_unlock_temperature": "Unlock above",
+              "frost_guard_unlock_hold": "Unlock hold time",
+              "frost_guard_angle": "Frost guard angle",
+              "frost_guard_allow_storm": "Allow storm stow while locked",
+              "snow_remover_hold": "Snow remover hold time"
+            },
+            "data_description": {
+              "frost_guard": "When the outdoor temperature reaches the park temperature, Helios moves once to the frost guard angle and then locks. It unlocks only after the temperature has stayed above the unlock temperature for the hold time.",
+              "frost_guard_park_temperature": "Move and lock at or below this temperature. Use a value above freezing so the actuator can still move freely.",
+              "frost_guard_unlock_temperature": "Must be warmer than the park temperature. The lock stays on until the reading has stayed above this for the hold time.",
+              "frost_guard_unlock_hold": "How long the temperature must stay above the unlock temperature before moves are allowed again. Stops the reading from flipping the lock on and off.",
+              "frost_guard_angle": "The angle of the one park move. Clamped to each panel’s soft limits. Flat (near the minimum) is safest for ice.",
+              "frost_guard_allow_storm": "When on, a storm can still stow the panel while frost lock is on. Wind, rain, snow and mode changes stay locked.",
+              "snow_remover_hold": "How long the snow remover keeps the panel at its maximum angle before automatic control resumes."
+            }
           }
         }
       }
@@ -555,7 +577,8 @@
       "calibration_failed": "The calibration stopped (a relay did not respond, or it took too long). Both relays are off.",
       "relays_unavailable": "A relay is offline ({entities}). Check the Zigbee device (is it reachable in Zigbee2MQTT?) and try again.",
       "outside_limits": "Outside the soft limits ({min}° to {max}°). The panel never goes beyond a limit, so it would stop at the nearest one. Enter an angle within the limits.",
-      "season_flat": "The winter and summer angles are equal, so the seasonal curve is flat. Suggested for latitude {latitude}°: winter {winter}°, summer {summer}°. Submit again to keep them equal."
+      "season_flat": "The winter and summer angles are equal, so the seasonal curve is flat. Suggested for latitude {latitude}°: winter {winter}°, summer {summer}°. Submit again to keep them equal.",
+      "unlock_below_park": "The unlock temperature must be higher than the park temperature."
     }
   },
   "entity": {
@@ -590,8 +613,13 @@
           "frost": "Frost",
           "calibrate": "Calibration",
           "trigger": "Stow trigger",
-          "quiet": "Quiet hours"
+          "quiet": "Quiet hours",
+          "frost_lock": "Frost lock",
+          "snow_remover": "Snow remover"
         }
+      },
+      "weather": {
+        "name": "Weather"
       }
     },
     "select": {
@@ -629,6 +657,9 @@
       },
       "actuator_available": {
         "name": "Actuator available"
+      },
+      "frost_lock": {
+        "name": "Frost lock"
       }
     },
     "button": {
@@ -643,6 +674,9 @@
       },
       "travel_cancel": {
         "name": "Travel calibration: cancel"
+      },
+      "snow_remover": {
+        "name": "Snow remover"
       }
     }
   },
@@ -777,6 +811,16 @@
           "description": "How long to close first. Default: the maximum run time."
         }
       }
+    },
+    "snow_remover": {
+      "name": "Snow remover",
+      "description": "Tilt the panel to its maximum angle so snow can slide off, then resumes automatic control after the hold time. Refused when frost lock is on, the temperature is at or below the park threshold, or the temperature sensor has no fresh value. Wind and storm stow still have priority.",
+      "fields": {
+        "duration": {
+          "name": "Hold time",
+          "description": "How long to stay at the maximum angle. Leave empty to use the configured default."
+        }
+      }
     }
   },
   "exceptions": {
@@ -794,6 +838,9 @@
     },
     "not_relays": {
       "message": "Choose a panel driven by two relays."
+    },
+    "snow_remover_refused": {
+      "message": "{panel}: snow remover refused ({reason}). It only runs when the temperature is safely above the park threshold and frost lock is off."
     }
   },
   "issues": {
@@ -808,6 +855,10 @@
     "relay_unavailable": {
       "title": "{panel}: relay offline",
       "description": "{entities} is unavailable, so Helios Tilt can't move this panel (Zigbee device offline?). Nothing is switched until it is back; then the panel goes to its current target by itself, and this notice clears. Check the device's power and its Zigbee link in Zigbee2MQTT."
+    },
+    "frost_sensor_unavailable": {
+      "title": "Temperature sensor is {status}",
+      "description": "The temperature source {entity} is {status}. While frost guard is on, the lock will not park or unlock on a missing reading, and it stays locked if it already is. The warning clears by itself once a fresh value arrives. You can also automate on the helios_tilt_frost_sensor_unavailable event."
     }
   }
 }

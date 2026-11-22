@@ -341,6 +341,15 @@ async def test_options(hass: HomeAssistant, setup_site) -> None:
             "direction_sides": "both",
             "direction_sector": 60,
         },
+        "frost_guard": {
+            "frost_guard": False,
+            "frost_guard_park_temperature": 1,
+            "frost_guard_unlock_temperature": 2,
+            "frost_guard_unlock_hold": 45,
+            "frost_guard_angle": 20,
+            "frost_guard_allow_storm": True,
+            "snow_remover_hold": 10,
+        },
     }
     result = await hass.config_entries.options.async_configure(result["flow_id"], base)
     assert result["errors"] == {"wind_resume_speed": "resume_above_stow"}
@@ -363,7 +372,7 @@ async def test_options_extras(hass: HomeAssistant, setup_site) -> None:
     entry = await setup_site()
     result = await hass.config_entries.options.async_init(entry.entry_id)
     schema_keys = {str(k) for k in result["data_schema"].schema}
-    assert {"sources", "triggers", "quiet", "direction"} <= schema_keys
+    assert {"sources", "triggers", "quiet", "direction", "frost_guard"} <= schema_keys
     base = {
         "wind_stow_speed": 40,
         "wind_resume_speed": 30,
@@ -393,6 +402,15 @@ async def test_options_extras(hass: HomeAssistant, setup_site) -> None:
             "direction_sides": "front",
             "direction_sector": 45,
         },
+        "frost_guard": {
+            "frost_guard": True,
+            "frost_guard_park_temperature": 1,
+            "frost_guard_unlock_temperature": 2,
+            "frost_guard_unlock_hold": 45,
+            "frost_guard_angle": 20,
+            "frost_guard_allow_storm": True,
+            "snow_remover_hold": 10,
+        },
     }
     result = await hass.config_entries.options.async_configure(result["flow_id"], base)
     assert result["errors"] == {"base": "quiet_incomplete"}
@@ -414,6 +432,50 @@ async def test_options_extras(hass: HomeAssistant, setup_site) -> None:
     assert site.direction_rule is True
     assert site.direction_sides == "front"
     assert site.direction_sector == 45
+
+
+async def test_frost_guard_unlock_must_be_warmer(
+    hass: HomeAssistant, setup_site
+) -> None:
+    """Unlock temperature must be above the park temperature."""
+    entry = await setup_site()
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    base = {
+        "wind_stow_speed": 50,
+        "wind_resume_speed": 35,
+        "calm_minutes": 10,
+        "storm_speed": 75,
+        "storm_hold_hours": 6,
+        "stale_minutes": 120,
+        "snow_mode": True,
+        "rain_mode": False,
+        "frost_mode": False,
+        "frost_temperature": -2,
+        "cloud_threshold": 80,
+        "min_move_interval": 5,
+        "manual_pause": 60,
+        "deadband": 2,
+        "hysteresis": 1,
+        "sources": {"rain_threshold": 5, "snow_threshold": 1},
+        "triggers": {},
+        "quiet": {"quiet_allow_safety": True},
+        "direction": {
+            "direction_rule": False,
+            "direction_sides": "both",
+            "direction_sector": 60,
+        },
+        "frost_guard": {
+            "frost_guard": True,
+            "frost_guard_park_temperature": 1,
+            "frost_guard_unlock_temperature": 1,
+            "frost_guard_unlock_hold": 45,
+            "frost_guard_angle": 20,
+            "frost_guard_allow_storm": True,
+            "snow_remover_hold": 10,
+        },
+    }
+    result = await hass.config_entries.options.async_configure(result["flow_id"], base)
+    assert result["errors"] == {"base": "unlock_below_park"}
 
 
 async def test_reconfigure_site(hass: HomeAssistant, setup_site) -> None:
